@@ -1,0 +1,5 @@
+[2026-07-13 12:00:01] INFO  Starting the logify auth engine
+[2026-07-13 12:00:02] DEBUG User checking session token
+[2026-07-13 12:00:03] ERROR Failed to validate OAuth signature
+[2026-07-13 12:00:04] WARN  Retrying authentication view after 3 seconds
+[2026-07-13 12:00:07] INFO  Session successfully established for user vinay

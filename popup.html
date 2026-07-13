@@ -65,6 +65,20 @@
         <div id="warn-keywords-list" class="keywords-list"></div>
       </div>
 
+      <!-- Custom Filter Presets Section -->
+      <div class="glass-panel presets-panel" style="margin-top: 12px;">
+        <div class="panel-section-title">Custom Filter Presets</div>
+        
+        <div class="preset-create-form">
+          <input type="text" id="preset-name-input" placeholder="Preset Name (e.g. Database)" />
+          <div class="preset-input-row" style="display: flex; gap: 8px; margin-top: 6px;">
+            <input type="text" id="preset-query-input" placeholder="Query/RegEx (e.g. SELECT|INSERT)" style="flex: 1;" />
+            <button id="add-preset-btn">+</button>
+          </div>
+        </div>
+        <div id="presets-list" class="presets-list" style="margin-top: 8px;"></div>
+      </div>
+
       <!-- Action Button -->
       <button id="activate-tab-btn" class="action-btn">
         <span class="btn-icon">⚡</span> Activate on This Tab

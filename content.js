@@ -20,6 +20,20 @@
     'rgba(255, 159, 67, 0.85)'   // Orange
   ];
 
+  // 10 Vibrant Multi-Color Highlight Colors
+  const MULTI_HIGHLIGHT_COLORS = [
+    'rgba(255, 107, 107, 0.85)', // Coral Red
+    'rgba(254, 202, 87, 0.85)',  // Gold Yellow
+    'rgba(78, 205, 196, 0.85)',  // Teal
+    'rgba(255, 159, 243, 0.85)', // Pink
+    'rgba(29, 209, 161, 0.85)',  // Mint Green
+    'rgba(84, 160, 255, 0.85)',  // Sky Blue
+    'rgba(255, 159, 67, 0.85)',   // Orange
+    'rgba(162, 155, 254, 0.85)',  // Lavender Purple
+    'rgba(250, 177, 160, 0.85)',  // Rose
+    'rgba(0, 184, 148, 0.85)'     // Emerald Green
+  ];
+
   // Traceback and Exception regex constants
   const traceRegex = /^\s+at\s+[\w\.\$\<\>\[\]]+\([\w\.\:\s]*\)/i;
   const pythonTraceHeader = /^traceback\s+\(most\s+recent\s+call\s+last\)/i;
@@ -31,17 +45,23 @@
   let forceVirtualScroll = false;
   let customErrorTerms = [];
   let customWarnTerms = [];
+  let storedMultiHighlights = [];
+  let storedFilterPresets = [];
   try {
     const settings = await chrome.storage.local.get({
       enabled: true,
       forceVirtualScroll: false,
       customErrorTerms: [],
-      customWarnTerms: []
+      customWarnTerms: [],
+      multiHighlights: [],
+      filterPresets: []
     });
     enabled = settings.enabled;
     forceVirtualScroll = settings.forceVirtualScroll;
     customErrorTerms = settings.customErrorTerms;
     customWarnTerms = settings.customWarnTerms;
+    storedMultiHighlights = settings.multiHighlights || [];
+    storedFilterPresets = settings.filterPresets || [];
   } catch (err) {
     console.warn("Logify: Storage read failed, falling back to defaults.");
   }
@@ -88,16 +108,24 @@
     expandedLines: new Set(), // set of 0-based expanded matching line indices
     lastNavigatedBookmark: -1,
     lastNavigatedTargetIndex: -1,
+    lastProgrammaticTargetIndex: -1,
+    lastProgrammaticBookmarkIndex: -1,
+    activeNavigatedIndex: -1,
     isAutoScrolling: false,
     autoScrollTimeout: null,
     searchQuery: '',
     useRegex: true,
     caseSensitive: false,
+    searchFilterEnabled: true,
     filterMode: 'all', // 'all' | 'errors' | 'warnings'
     isVirtual: false,
     LINE_HEIGHT: 22,
     OVERSCAN: 20,
     globalWrap: false,
+    multiHighlights: storedMultiHighlights.length === 10
+      ? storedMultiHighlights.map(h => h.pinned ? h : { text: '', pinned: false })
+      : Array.from({ length: 10 }, () => ({ text: '', pinned: false })),
+    filterPresets: storedFilterPresets,
     shadowRoot: null,
     scrollContainer: null,
     linesContainer: null,
@@ -127,8 +155,8 @@
 
     // Check for standard JSON or custom bracketed structures ({}, [], or ())
     const hasJson = (text.indexOf('{') !== -1 && text.indexOf('}') !== -1) ||
-                    (text.indexOf('[') !== -1 && text.indexOf(']') !== -1) ||
-                    (text.indexOf('(') !== -1 && text.indexOf(')') !== -1);
+      (text.indexOf('[') !== -1 && text.indexOf(']') !== -1) ||
+      (text.indexOf('(') !== -1 && text.indexOf(')') !== -1);
 
     if (isError) STATE.stats.errors++;
     if (isWarning) STATE.stats.warnings++;
@@ -168,9 +196,18 @@
         <div class="search-wrapper">
           <input type="text" id="logify-search" placeholder="Filter lines with regex or use | for multiple terms" />
           <div class="search-toggles">
+            <button id="toggle-filter" class="toggle-btn active" title="Filter Matches (show matching lines only)">
+              <svg class="toggle-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </button>
             <button id="toggle-case" class="toggle-btn" title="Match Case (aA)">aA</button>
             <button id="toggle-regex" class="toggle-btn active" title="Use Regular Expression (.*)">.*</button>
           </div>
+        </div>
+        <div class="preset-dropdown-wrapper">
+          <button id="preset-trigger" class="taskbar-btn" title="Filter Presets">📋 Presets</button>
+          <div id="preset-menu" class="preset-menu hidden"></div>
         </div>
         <button id="clear-filters-btn" class="taskbar-btn hidden" title="Clear Filters (Esc)">⎚ Clear</button>
         <span class="total-lines-text">Total: ${STATE.stats.total.toLocaleString()}</span>
@@ -178,12 +215,12 @@
       
       <div class="taskbar-center">
         <!-- Error Navigation Group -->
-        <div class="nav-group">
+        <div id="nav-group-errors" class="nav-group nav-mode-error">
           <button id="badge-errors" class="stat-badge errors" title="Toggle Error Filter">
             🔴 ${STATE.stats.errors}
           </button>
-          <button id="nav-target-prev" class="taskbar-btn nav-arrow" title="Previous Error/Match (Shift+F8)">⤒</button>
-          <button id="nav-target-next" class="taskbar-btn nav-arrow" title="Next Error/Match (F8)">⤓</button>
+          <button id="nav-target-next" class="taskbar-btn nav-arrow" title="Next Error (F8)">🔴 ⤓</button>
+          <button id="nav-target-prev" class="taskbar-btn nav-arrow" title="Previous Error (Shift+F8)">🔴 ⤒</button>
         </div>
 
         <!-- Warning Filter Badge (High-highlighting warning symbol) -->
@@ -196,13 +233,14 @@
           <button id="badge-bookmarks" class="stat-badge bookmarks" title="Toggle Bookmarks Filter">
             ⭐ 0
           </button>
-          <button id="nav-bookmarks-prev" class="taskbar-btn nav-arrow" disabled title="Previous Bookmark (Shift+F2)">⤒</button>
           <button id="nav-bookmarks-next" class="taskbar-btn nav-arrow" disabled title="Next Bookmark (F2)">⤓</button>
+          <button id="nav-bookmarks-prev" class="taskbar-btn nav-arrow" disabled title="Previous Bookmark (Shift+F2)">⤒</button>
         </div>
       </div>
 
       <div class="taskbar-right">
         <button id="copy-matches-btn" class="taskbar-btn hidden" title="Copy Filtered Lines">⧉</button>
+        <button id="toggle-highlights-btn" class="taskbar-btn" title="Multi-Color Highlights (Alt+H)">🖍️ Highlights</button>
         <button id="toggle-wrap-btn" class="taskbar-btn" title="Toggle Word Wrap (Alt+W)">↩</button>
         <button id="restore-view-btn" class="taskbar-btn close-btn" title="Close Logify & Restore Raw View">✕</button>
       </div>
@@ -212,6 +250,19 @@
     <div id="logify-viewport" class="${STATE.isVirtual ? '' : 'raw-layout'}">
       <div id="logify-spacer"></div>
       <div id="logify-lines"></div>
+    </div>
+
+    <!-- Multi-Color Highlights Modal Overlay -->
+    <div id="highlights-modal" class="highlights-modal-overlay hidden">
+      <div class="highlights-modal-content">
+        <div class="modal-header">
+          <span class="modal-title">🌈 Multi-Color Highlights</span>
+          <button class="modal-close" id="close-highlights-btn">✕</button>
+        </div>
+        <div id="highlights-grid" class="highlights-grid">
+          <!-- 10 rows generated dynamically -->
+        </div>
+      </div>
     </div>
 
     <!-- Toast Notifications Container -->
@@ -246,12 +297,16 @@
   STATE.linesContainer = STATE.shadowRoot.getElementById('logify-lines');
 
   const searchInput = STATE.shadowRoot.getElementById('logify-search');
+  const presetTrigger = STATE.shadowRoot.getElementById('preset-trigger');
+  const presetMenu = STATE.shadowRoot.getElementById('preset-menu');
+  const toggleFilterBtn = STATE.shadowRoot.getElementById('toggle-filter');
   const toggleCaseBtn = STATE.shadowRoot.getElementById('toggle-case');
   const toggleRegexBtn = STATE.shadowRoot.getElementById('toggle-regex');
   const badgeErrors = STATE.shadowRoot.getElementById('badge-errors');
   const badgeWarnings = STATE.shadowRoot.getElementById('badge-warnings');
   const badgeBookmarks = STATE.shadowRoot.getElementById('badge-bookmarks');
   const copyMatchesBtn = STATE.shadowRoot.getElementById('copy-matches-btn');
+  const toggleHighlightsBtn = STATE.shadowRoot.getElementById('toggle-highlights-btn');
   const toggleWrapBtn = STATE.shadowRoot.getElementById('toggle-wrap-btn');
   const restoreViewBtn = STATE.shadowRoot.getElementById('restore-view-btn');
   const clearFiltersBtn = STATE.shadowRoot.getElementById('clear-filters-btn');
@@ -261,15 +316,95 @@
   const navBookmarksPrev = STATE.shadowRoot.getElementById('nav-bookmarks-prev');
   const navBookmarksNext = STATE.shadowRoot.getElementById('nav-bookmarks-next');
 
-  // Initialize display list
+  const highlightsModal = STATE.shadowRoot.getElementById('highlights-modal');
+  const closeHighlightsBtn = STATE.shadowRoot.getElementById('close-highlights-btn');
+
+  function updatePresetDropdown() {
+    if (!presetMenu) return;
+    presetMenu.innerHTML = '';
+    console.log("Logify Presets Loaded:", STATE.filterPresets);
+    
+    const defaultItem = document.createElement('div');
+    defaultItem.className = 'preset-menu-item';
+    defaultItem.dataset.value = '';
+    defaultItem.innerHTML = `<span class="preset-item-name">-- No Preset --</span>`;
+    presetMenu.appendChild(defaultItem);
+
+    STATE.filterPresets.forEach(preset => {
+      const item = document.createElement('div');
+      item.className = 'preset-menu-item';
+      item.dataset.value = preset.query;
+      item.innerHTML = `
+        <span class="preset-item-name">${preset.name}</span>
+        <span class="preset-item-query">${preset.query}</span>
+      `;
+      presetMenu.appendChild(item);
+    });
+  }
+
+  // Initialize display list and built dynamic panels
+  buildHighlightsPanel();
+  updatePresetDropdown();
   computeDisplayList();
   render();
 
+  // Multi-Color Highlights Modal handlers
+  toggleHighlightsBtn.addEventListener('click', () => {
+    highlightsModal.classList.toggle('hidden');
+  });
+
+  closeHighlightsBtn.addEventListener('click', () => {
+    highlightsModal.classList.add('hidden');
+  });
+
+  highlightsModal.addEventListener('click', (e) => {
+    if (e.target === highlightsModal) {
+      highlightsModal.classList.add('hidden');
+    }
+  });
+
   // 7. Event Listeners (Taskbar Controls)
+
+  presetTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    presetMenu.classList.toggle('hidden');
+  });
+
+  window.addEventListener('click', () => {
+    if (presetMenu) {
+      presetMenu.classList.add('hidden');
+    }
+  });
+
+  presetMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('.preset-menu-item');
+    if (!item) return;
+
+    const val = item.dataset.value;
+    STATE.searchQuery = val;
+    searchInput.value = val;
+    if (val) {
+      const name = item.querySelector('.preset-item-name').textContent;
+      presetTrigger.textContent = `📋 ${name}`;
+      presetTrigger.classList.add('active');
+      STATE.filterMode = 'all';
+      badgeErrors.classList.remove('active');
+      badgeWarnings.classList.remove('active');
+      badgeBookmarks.classList.remove('active');
+    } else {
+      presetTrigger.textContent = '📋 Presets';
+      presetTrigger.classList.remove('active');
+    }
+    computeDisplayList(true);
+    render();
+    presetMenu.classList.add('hidden');
+  });
 
   // Search input debouncer
   let searchTimeout;
   searchInput.addEventListener('input', () => {
+    presetTrigger.textContent = '📋 Presets';
+    presetTrigger.classList.remove('active');
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       STATE.searchQuery = searchInput.value;
@@ -283,6 +418,14 @@
       computeDisplayList(true);
       render();
     }, 150);
+  });
+
+  toggleFilterBtn.addEventListener('click', () => {
+    STATE.searchFilterEnabled = !STATE.searchFilterEnabled;
+    toggleFilterBtn.classList.toggle('active', STATE.searchFilterEnabled);
+    showToast(STATE.searchFilterEnabled ? "Filter Matches enabled (hiding non-matching lines)" : "Filter Matches disabled (showing all lines, highlighting only)");
+    computeDisplayList(true);
+    render();
   });
 
   toggleCaseBtn.addEventListener('click', () => {
@@ -306,6 +449,8 @@
   clearFiltersBtn.addEventListener('click', () => {
     STATE.searchQuery = '';
     searchInput.value = '';
+    presetTrigger.textContent = '📋 Presets';
+    presetTrigger.classList.remove('active');
     STATE.filterMode = 'all';
     badgeErrors.classList.remove('active');
     badgeWarnings.classList.remove('active');
@@ -323,6 +468,8 @@
       STATE.filterMode = 'errors';
       STATE.searchQuery = '';
       searchInput.value = '';
+      presetTrigger.textContent = '📋 Presets';
+      presetTrigger.classList.remove('active');
       badgeErrors.classList.add('active');
       badgeWarnings.classList.remove('active');
       badgeBookmarks.classList.remove('active');
@@ -339,6 +486,8 @@
       STATE.filterMode = 'warnings';
       STATE.searchQuery = '';
       searchInput.value = '';
+      presetTrigger.textContent = '📋 Presets';
+      presetTrigger.classList.remove('active');
       badgeWarnings.classList.add('active');
       badgeErrors.classList.remove('active');
       badgeBookmarks.classList.remove('active');
@@ -355,6 +504,8 @@
       STATE.filterMode = 'bookmarks';
       STATE.searchQuery = '';
       searchInput.value = '';
+      presetTrigger.textContent = '📋 Presets';
+      presetTrigger.classList.remove('active');
       badgeBookmarks.classList.add('active');
       badgeErrors.classList.remove('active');
       badgeWarnings.classList.remove('active');
@@ -378,35 +529,62 @@
   function cycleBookmarks(direction = 'next') {
     if (STATE.bookmarks.size === 0) return;
 
-    // Sort bookmarks to cycle sequentially
-    const sorted = Array.from(STATE.bookmarks).sort((a, b) => a - b);
-
-    let targetIdx;
-    if (direction === 'next') {
-      targetIdx = sorted.find(idx => idx > STATE.lastNavigatedBookmark);
-      if (targetIdx === undefined) {
-        targetIdx = sorted[0];
-      }
-    } else {
-      const reversed = [...sorted].reverse();
-      targetIdx = reversed.find(idx => idx < STATE.lastNavigatedBookmark);
-      if (targetIdx === undefined) {
-        targetIdx = reversed[0];
+    // Get bookmark line indices inside the current displayList
+    const bookmarkDisplayIndices = [];
+    for (let i = 0; i < STATE.displayList.length; i++) {
+      const item = STATE.displayList[i];
+      if (item.type === 'line' && STATE.bookmarks.has(item.line.originalIndex)) {
+        bookmarkDisplayIndices.push(i);
       }
     }
 
-    STATE.lastNavigatedBookmark = targetIdx;
+    if (bookmarkDisplayIndices.length === 0) {
+      showToast("Bookmarked lines are hidden under active filters.");
+      return;
+    }
 
-    // Find index of this line inside the current displayList to jump to it
-    const displayListIndex = STATE.displayList.findIndex(
-      item => item.type === 'line' && item.line.originalIndex === targetIdx
-    );
+    // Determine current visible viewport boundaries on-the-fly
+    const scrollTop = STATE.scrollContainer.scrollTop;
+    const viewportHeight = STATE.scrollContainer.clientHeight;
+    const currentViewportTopLine = STATE.isVirtual
+      ? Math.floor(scrollTop / STATE.LINE_HEIGHT)
+      : Math.floor(scrollTop / 22);
+    const visibleRowCount = STATE.isVirtual
+      ? Math.ceil(viewportHeight / STATE.LINE_HEIGHT)
+      : Math.ceil(viewportHeight / 22);
 
-    if (displayListIndex !== -1) {
-      scrollToIndex(displayListIndex);
-      // Flash row
+    const isLastTargetVisible = STATE.lastProgrammaticBookmarkIndex !== -1 &&
+      STATE.lastProgrammaticBookmarkIndex >= currentViewportTopLine &&
+      STATE.lastProgrammaticBookmarkIndex < currentViewportTopLine + visibleRowCount;
+
+    const referenceIndex = isLastTargetVisible ? STATE.lastProgrammaticBookmarkIndex : currentViewportTopLine;
+
+    let targetDisplayIdx = -1;
+
+    if (direction === 'next') {
+      const searchStart = isLastTargetVisible ? referenceIndex : referenceIndex - 1;
+      targetDisplayIdx = bookmarkDisplayIndices.find(idx => idx > searchStart);
+      if (targetDisplayIdx === undefined) targetDisplayIdx = bookmarkDisplayIndices[0]; // cycle wrap
+    } else {
+      const reversed = [...bookmarkDisplayIndices].reverse();
+      const searchStart = isLastTargetVisible ? referenceIndex : referenceIndex + visibleRowCount;
+      targetDisplayIdx = reversed.find(idx => idx < searchStart);
+      if (targetDisplayIdx === undefined) targetDisplayIdx = bookmarkDisplayIndices[bookmarkDisplayIndices.length - 1]; // cycle wrap
+    }
+
+    STATE.lastProgrammaticBookmarkIndex = targetDisplayIdx;
+    STATE.activeNavigatedIndex = targetDisplayIdx;
+    render();
+
+    if (targetDisplayIdx !== -1) {
+      scrollToIndex(targetDisplayIdx);
+      const targetItem = STATE.displayList[targetDisplayIdx];
+      const targetOrigIdx = targetItem.line.originalIndex;
+      STATE.lastNavigatedBookmark = targetOrigIdx;
+
+      // Flash target row visually
       setTimeout(() => {
-        const rowEl = STATE.shadowRoot.querySelector(`.log-row[data-orig-idx="${targetIdx}"]`);
+        const rowEl = STATE.shadowRoot.querySelector(`.log-row[data-orig-idx="${targetOrigIdx}"]`);
         if (rowEl) {
           rowEl.style.transition = 'background-color 0.1s ease';
           rowEl.style.backgroundColor = 'rgba(59, 130, 246, 0.25)';
@@ -415,8 +593,6 @@
           }, 600);
         }
       }, 50);
-    } else {
-      showToast("Bookmarked line is hidden under collapsed filters.");
     }
   }
 
@@ -460,15 +636,6 @@
   STATE.scrollContainer.addEventListener('scroll', () => {
     if (STATE.isVirtual) {
       requestAnimationFrame(render);
-    }
-
-    // On manual user scrolls, sync lastNavigatedTargetIndex to the current viewport position
-    if (!STATE.isAutoScrolling) {
-      const currentScrollTop = STATE.scrollContainer.scrollTop;
-      const currentDisplayIndex = STATE.isVirtual
-        ? Math.floor(currentScrollTop / STATE.LINE_HEIGHT)
-        : Math.floor(currentScrollTop / 22);
-      STATE.lastNavigatedTargetIndex = currentDisplayIndex;
     }
   }, { passive: true });
 
@@ -524,13 +691,18 @@
   window.addEventListener('keydown', (e) => {
     // If Escape is pressed
     if (e.key === 'Escape') {
+      const hModal = STATE.shadowRoot.getElementById('highlights-modal');
       const modal = STATE.shadowRoot.querySelector('.json-modal-overlay');
-      if (modal) {
+      if (hModal && !hModal.classList.contains('hidden')) {
+        hModal.classList.add('hidden');
+      } else if (modal) {
         modal.remove();
       } else {
         // Clear filters but retain bookmarks
         STATE.searchQuery = '';
         searchInput.value = '';
+        presetTrigger.textContent = '📋 Presets';
+        presetTrigger.classList.remove('active');
         STATE.filterMode = 'all';
         badgeErrors.classList.remove('active');
         badgeWarnings.classList.remove('active');
@@ -555,10 +727,32 @@
       return;
     }
 
+    // Alt+H toggles multi-color highlights
+    if (e.altKey && e.key.toLowerCase() === 'h') {
+      e.preventDefault();
+      toggleHighlightsBtn.click();
+      return;
+    }
+
     // F8 cycles errors/matches, Shift+F8 cycles backwards
     if (e.key === 'F8') {
       e.preventDefault();
       cycleNavigationTarget(e.shiftKey ? 'prev' : 'next');
+      return;
+    }
+
+    // Ctrl+End to scroll to bottom of log viewport without shifting outer page layout
+    if (e.ctrlKey && e.key === 'End') {
+      e.preventDefault();
+      STATE.scrollContainer.scrollTop = STATE.scrollContainer.scrollHeight;
+      return;
+    }
+
+    // Ctrl+Home to scroll to top of log viewport
+    if (e.ctrlKey && e.key === 'Home') {
+      e.preventDefault();
+      STATE.scrollContainer.scrollTop = 0;
+      return;
     }
   });
 
@@ -571,8 +765,8 @@
       STATE.expandedLines.clear();
     }
     const list = [];
-    const query = STATE.searchQuery.trim();
-    const isFiltered = query !== '' || STATE.filterMode !== 'all';
+    const query = STATE.searchQuery;
+    const isFiltered = query.trim() !== '' || STATE.filterMode !== 'all';
 
     // Toggle copy and clear filter buttons visibility
     copyMatchesBtn.classList.toggle('hidden', !isFiltered);
@@ -582,6 +776,21 @@
 
     // Reset last navigated index on search/filter changes
     STATE.lastNavigatedTargetIndex = -1;
+    STATE.lastProgrammaticTargetIndex = -1;
+    STATE.lastProgrammaticBookmarkIndex = -1;
+    STATE.lastNavigatedBookmark = -1;
+    STATE.activeNavigatedIndex = -1;
+
+    const navGroupErrors = STATE.shadowRoot.getElementById('nav-group-errors');
+    if (navGroupErrors) {
+      if (isFiltered) {
+        navGroupErrors.classList.remove('nav-mode-error');
+        navGroupErrors.classList.add('nav-mode-search');
+      } else {
+        navGroupErrors.classList.remove('nav-mode-search');
+        navGroupErrors.classList.add('nav-mode-error');
+      }
+    }
 
     if (!isFiltered) {
       // Map all lines directly
@@ -590,6 +799,8 @@
       }
       STATE.matchedIndices = new Set();
       if (navTargetPrev && navTargetNext) {
+        navTargetPrev.innerHTML = `🔴 ⤒`;
+        navTargetNext.innerHTML = `🔴 ⤓`;
         navTargetPrev.title = "Previous Error (Shift+F8)";
         navTargetNext.title = "Next Error (F8)";
       }
@@ -649,8 +860,18 @@
     STATE.matchedIndices = new Set(matches);
 
     if (navTargetPrev && navTargetNext) {
+      navTargetPrev.innerHTML = `🔍 ⤒`;
+      navTargetNext.innerHTML = `🔍 ⤓`;
       navTargetPrev.title = "Previous Match (Shift+F8)";
       navTargetNext.title = "Next Match (F8)";
+    }
+
+    if (!STATE.searchFilterEnabled) {
+      for (let i = 0; i < STATE.allLines.length; i++) {
+        list.push({ type: 'line', line: STATE.allLines[i] });
+      }
+      STATE.displayList = list;
+      return;
     }
 
     // Construct the display list WITHOUT Gaps initially (filtered lines show one after another)
@@ -847,13 +1068,13 @@
     const maxLineDigits = String(STATE.stats.total).length;
     const lineNumWidth = maxLineDigits * 8; // Consolas monospace font average digit width (approx 8px)
     const isFiltered = STATE.searchQuery.trim() !== '' || STATE.filterMode !== 'all';
-    
+
     // Math:
-    // - If filtered: JSON button (18px) + Gap (4px) + Expand button (18px) + Gap (4px) + lineNumWidth + margins (20px) = 64 + lineNumWidth
-    // - If not filtered: JSON button (18px) + Gap (4px) + lineNumWidth + margins (16px) = 38 + lineNumWidth
-    const gutterWidth = isFiltered 
-      ? (64 + lineNumWidth) 
-      : (38 + lineNumWidth);
+    // - If filtered: JSON button (24px) + Gap (4px) + Expand button (18px) + Gap (4px) + lineNumWidth + margins (20px) = 70 + lineNumWidth
+    // - If not filtered: JSON button (24px) + Gap (4px) + lineNumWidth + margins (16px) = 44 + lineNumWidth
+    const gutterWidth = isFiltered
+      ? (70 + lineNumWidth)
+      : (44 + lineNumWidth);
 
     let gutterStyle = STATE.shadowRoot.getElementById('dynamic-gutter-style');
     if (!gutterStyle) {
@@ -885,7 +1106,7 @@
     const viewportHeight = STATE.scrollContainer.clientHeight;
 
     const totalLinesCount = STATE.displayList.length;
-    const totalHeight = totalLinesCount * STATE.LINE_HEIGHT;
+    const totalHeight = (totalLinesCount * STATE.LINE_HEIGHT) + 120;
 
     // Adjust scrollable spacer height
     const spacer = STATE.shadowRoot.getElementById('logify-spacer');
@@ -898,8 +1119,8 @@
     // Position lines absolute container
     STATE.linesContainer.style.transform = `translateY(${startIdx * STATE.LINE_HEIGHT}px)`;
 
-    const query = STATE.searchQuery.trim();
-    const queryTerms = query ? query.split('|').map(t => t.trim()).filter(Boolean) : [];
+    const query = STATE.searchQuery;
+    const queryTerms = query ? query.split('|').filter(Boolean) : [];
 
     // Build single regex matching all query terms for highlight color mapping
     let highlightRegex = null;
@@ -933,16 +1154,13 @@
         const origIdx = line.originalIndex;
         const isBookmarked = STATE.bookmarks.has(origIdx);
 
-        // Highlight matched text using colors matching query capture groups
-        let displayText = escapeHTML(line.text);
-        if (highlightRegex) {
-          displayText = displayText.replace(highlightRegex, (match, ...groups) => {
-            // Find which term capture group matched to assign correct color index
-            const matchedGroupIndex = groups.slice(0, queryTerms.length).findIndex(v => v !== undefined);
-            const color = HIGHLIGHT_COLORS[matchedGroupIndex !== -1 ? matchedGroupIndex % HIGHLIGHT_COLORS.length : 0];
-            return `<mark class="log-highlight" style="background-color:${color};">${match}</mark>`;
-          });
-        }
+        const displayText = applyHighlightRules(
+          line.text,
+          queryTerms,
+          highlightRegex,
+          STATE.multiHighlights,
+          MULTI_HIGHLIGHT_COLORS
+        );
 
         const wrapClass = STATE.globalWrap ? 'wrap-enabled' : '';
         const errorClass = line.isError ? 'log-row-error' : '';
@@ -952,22 +1170,25 @@
         const isFiltered = query !== '' || STATE.filterMode !== 'all';
         const isMatch = STATE.matchedIndices.has(origIdx - 1);
         const isExpanded = STATE.expandedLines.has(origIdx - 1);
-        
+        const isActiveNav = (i === STATE.activeNavigatedIndex);
+
         const expandedClass = isExpanded ? 'expanded-match' : '';
         const expandBtnClass = isMatch ? 'can-expand' : '';
-        const expandBtnStyle = isFiltered ? 'display: flex;' : 'display: none;';
-        
+        const expandBtnStyle = (isFiltered && STATE.searchFilterEnabled) ? 'display: flex;' : 'display: none;';
+        const activeNavClass = isActiveNav ? 'active-nav-line' : '';
+        const matchClass = (isFiltered && STATE.searchFilterEnabled) ? (isMatch ? 'filter-match' : 'context-line') : '';
+
         const expandSymbol = isExpanded ? '▼' : '>';
         const expandTitle = isExpanded ? 'Collapse context' : 'Show surrounding context';
 
         html += `
-          <div class="log-row ${wrapClass} ${errorClass} ${warnClass} ${bookmarkClass} ${expandedClass}" 
+          <div class="log-row ${wrapClass} ${errorClass} ${warnClass} ${bookmarkClass} ${expandedClass} ${activeNavClass} ${matchClass}" 
                data-orig-idx="${origIdx}"
                style="position:absolute; top:${topOffset}px; min-height:${STATE.LINE_HEIGHT}px;">
             <div class="log-gutter">
               <button class="gutter-btn json-btn ${line.hasJson ? 'has-json' : ''}" 
                       data-line-index="${origIdx}" 
-                      title="Format JSON">{}</button>
+                      title="Format JSON">{ }</button>
               <button class="gutter-btn expand-btn ${expandBtnClass}" 
                       style="${expandBtnStyle}" 
                       data-line-index="${origIdx}" 
@@ -988,8 +1209,8 @@
     const spacer = STATE.shadowRoot.getElementById('logify-spacer');
     spacer.style.height = '0px';
 
-    const query = STATE.searchQuery.trim();
-    const queryTerms = query ? query.split('|').map(t => t.trim()).filter(Boolean) : [];
+    const query = STATE.searchQuery;
+    const queryTerms = query ? query.split('|').filter(Boolean) : [];
 
     let highlightRegex = null;
     if (queryTerms.length > 0) {
@@ -1021,14 +1242,13 @@
         const origIdx = line.originalIndex;
         const isBookmarked = STATE.bookmarks.has(origIdx);
 
-        let displayText = escapeHTML(line.text);
-        if (highlightRegex) {
-          displayText = displayText.replace(highlightRegex, (match, ...groups) => {
-            const matchedGroupIndex = groups.slice(0, queryTerms.length).findIndex(v => v !== undefined);
-            const color = HIGHLIGHT_COLORS[matchedGroupIndex !== -1 ? matchedGroupIndex % HIGHLIGHT_COLORS.length : 0];
-            return `<mark class="log-highlight" style="background-color:${color};">${match}</mark>`;
-          });
-        }
+        const displayText = applyHighlightRules(
+          line.text,
+          queryTerms,
+          highlightRegex,
+          STATE.multiHighlights,
+          MULTI_HIGHLIGHT_COLORS
+        );
 
         const wrapClass = STATE.globalWrap ? 'wrap-enabled' : '';
         const errorClass = line.isError ? 'log-row-error' : '';
@@ -1038,20 +1258,23 @@
         const isFiltered = query !== '' || STATE.filterMode !== 'all';
         const isMatch = STATE.matchedIndices.has(origIdx - 1);
         const isExpanded = STATE.expandedLines.has(origIdx - 1);
-        
+        const isActiveNav = (i === STATE.activeNavigatedIndex);
+
         const expandedClass = isExpanded ? 'expanded-match' : '';
         const expandBtnClass = isMatch ? 'can-expand' : '';
-        const expandBtnStyle = isFiltered ? 'display: flex;' : 'display: none;';
-        
+        const expandBtnStyle = (isFiltered && STATE.searchFilterEnabled) ? 'display: flex;' : 'display: none;';
+        const activeNavClass = isActiveNav ? 'active-nav-line' : '';
+        const matchClass = (isFiltered && STATE.searchFilterEnabled) ? (isMatch ? 'filter-match' : 'context-line') : '';
+
         const expandSymbol = isExpanded ? '▼' : '>';
         const expandTitle = isExpanded ? 'Collapse context' : 'Show surrounding context';
 
         html += `
-          <div class="log-row ${wrapClass} ${errorClass} ${warnClass} ${bookmarkClass} ${expandedClass}" data-orig-idx="${origIdx}">
+          <div class="log-row ${wrapClass} ${errorClass} ${warnClass} ${bookmarkClass} ${expandedClass} ${activeNavClass} ${matchClass}" data-orig-idx="${origIdx}">
             <div class="log-gutter">
               <button class="gutter-btn json-btn ${line.hasJson ? 'has-json' : ''}" 
                       data-line-index="${origIdx}" 
-                      title="Format JSON">{}</button>
+                      title="Format JSON">{ }</button>
               <button class="gutter-btn expand-btn ${expandBtnClass}" 
                       style="${expandBtnStyle}" 
                       data-line-index="${origIdx}" 
@@ -1116,18 +1339,39 @@
       return;
     }
 
+    // Determine current visible viewport boundaries on-the-fly
+    const scrollTop = STATE.scrollContainer.scrollTop;
+    const viewportHeight = STATE.scrollContainer.clientHeight;
+    const currentViewportTopLine = STATE.isVirtual
+      ? Math.floor(scrollTop / STATE.LINE_HEIGHT)
+      : Math.floor(scrollTop / 22);
+    const visibleRowCount = STATE.isVirtual
+      ? Math.ceil(viewportHeight / STATE.LINE_HEIGHT)
+      : Math.ceil(viewportHeight / 22);
+
+    const isLastTargetVisible = STATE.lastProgrammaticTargetIndex !== -1 &&
+      STATE.lastProgrammaticTargetIndex >= currentViewportTopLine &&
+      STATE.lastProgrammaticTargetIndex < currentViewportTopLine + visibleRowCount;
+
+    const referenceIndex = isLastTargetVisible ? STATE.lastProgrammaticTargetIndex : currentViewportTopLine;
+
     let targetIdx = -1;
 
     if (direction === 'next') {
-      targetIdx = targetIndices.find(idx => idx > STATE.lastNavigatedTargetIndex);
+      const searchStart = isLastTargetVisible ? referenceIndex : referenceIndex - 1;
+      targetIdx = targetIndices.find(idx => idx > searchStart);
       if (targetIdx === undefined) targetIdx = targetIndices[0]; // cycle wrap
     } else {
       const reversed = [...targetIndices].reverse();
-      targetIdx = reversed.find(idx => idx < STATE.lastNavigatedTargetIndex);
+      const searchStart = isLastTargetVisible ? referenceIndex : referenceIndex + visibleRowCount;
+      targetIdx = reversed.find(idx => idx < searchStart);
       if (targetIdx === undefined) targetIdx = targetIndices[targetIndices.length - 1]; // cycle wrap
     }
 
+    STATE.lastProgrammaticTargetIndex = targetIdx;
     STATE.lastNavigatedTargetIndex = targetIdx;
+    STATE.activeNavigatedIndex = targetIdx;
+    render();
 
     if (targetIdx !== -1) {
       scrollToIndex(targetIdx);
@@ -1376,7 +1620,7 @@
       let formattedText;
       let highlightedHTML;
       let blockTitle;
-      
+
       if (block.parsed) {
         formattedText = JSON.stringify(block.parsed, null, 2);
         highlightedHTML = highlightJSON(formattedText);
@@ -1429,7 +1673,7 @@
               button.style.backgroundColor = "rgba(16, 185, 129, 0.2)";
               button.style.borderColor = "rgba(16, 185, 129, 0.4)";
               button.style.color = "#10b981";
-              
+
               setTimeout(() => {
                 button.textContent = "Copy Formatted";
                 button.style.backgroundColor = "";
@@ -1516,6 +1760,11 @@
   // 13. Dynamic Settings Listener (Updates classification in real-time)
   chrome.storage.onChanged.addListener((changes) => {
     let needsReclassification = false;
+    if (changes.filterPresets) {
+      console.log("Logify Presets Storage Changed:", changes.filterPresets.newValue);
+      STATE.filterPresets = changes.filterPresets.newValue || [];
+      updatePresetDropdown();
+    }
     if (changes.customErrorTerms) {
       customErrorTerms = changes.customErrorTerms.newValue || [];
       needsReclassification = true;
@@ -1560,6 +1809,150 @@
       render();
     }
   });
+
+  // Apply both search highlight regex and 10 multi-color highlight regexes to raw log line text
+  function applyHighlightRules(rawText, queryTerms, searchRegex, multiHighlights, highlightColors) {
+    let displayText = escapeHTML(rawText);
+    let segments = [{ text: displayText, html: false }];
+
+    // 1. Apply multi-color highlights (regex supported by default, case-insensitive)
+    for (let idx = 0; idx < 10; idx++) {
+      const term = multiHighlights[idx]?.text || '';
+      if (!term.trim()) continue;
+
+      try {
+        const regex = new RegExp(term, 'gi');
+        segments = splitSegments(segments, regex, (match) => {
+          return `<mark class="log-multi-highlight" style="background-color: ${highlightColors[idx]}; color: #000000; font-weight: bold; border-radius: 2px; padding: 0 1px;">${match}</mark>`;
+        });
+      } catch (err) {
+        // Ignore invalid user regex
+      }
+    }
+
+    // 2. Apply search highlight regex
+    if (searchRegex) {
+      segments = splitSegments(segments, searchRegex, (match) => {
+        let color = '#3b82f6';
+        if (queryTerms && queryTerms.length > 0) {
+          const matchedGroupIndex = queryTerms.findIndex(t => {
+            try { return new RegExp(t, 'i').test(match); } catch(e) { return false; }
+          });
+          color = HIGHLIGHT_COLORS[matchedGroupIndex !== -1 ? matchedGroupIndex % HIGHLIGHT_COLORS.length : 0];
+        }
+        return `<mark class="log-highlight" style="background-color:${color};">${match}</mark>`;
+      });
+    }
+
+    return segments.map(s => s.text).join('');
+  }
+
+  // Segment splitter utility supporting safe tag-skipping sequential regex matching
+  function splitSegments(segments, regex, wrapFn) {
+    const result = [];
+    for (const seg of segments) {
+      if (seg.html) {
+        result.push(seg);
+        continue;
+      }
+      
+      const text = seg.text;
+      let match;
+      let lastIndex = 0;
+      
+      // Enforce global match flag
+      const flags = regex.flags.includes('g') ? regex.flags : regex.flags + 'g';
+      const gRegex = new RegExp(regex.source, flags);
+      
+      let hasMatch = false;
+      while ((match = gRegex.exec(text)) !== null) {
+        // Avoid infinite loop on empty regex matches
+        if (match[0].length === 0) {
+          gRegex.lastIndex++;
+          continue;
+        }
+        hasMatch = true;
+        
+        // Push leading slice
+        if (match.index > lastIndex) {
+          result.push({ text: text.substring(lastIndex, match.index), html: false });
+        }
+        
+        // Push wrapped match
+        result.push({ text: wrapFn(match[0]), html: true });
+        
+        lastIndex = gRegex.lastIndex;
+      }
+      
+      if (!hasMatch) {
+        result.push(seg);
+      } else if (lastIndex < text.length) {
+        result.push({ text: text.substring(lastIndex), html: false });
+      }
+    }
+    return result;
+  }
+
+  // Build the 10 multi-color highlight rows dynamically
+  function buildHighlightsPanel() {
+    const grid = STATE.shadowRoot.getElementById('highlights-grid');
+    if (!grid) return;
+    
+    let html = '';
+    for (let i = 0; i < 10; i++) {
+      const h = STATE.multiHighlights[i] || { text: '', pinned: false };
+      const color = MULTI_HIGHLIGHT_COLORS[i];
+      const pinClass = h.pinned ? 'highlight-pin-btn active' : 'highlight-pin-btn';
+      
+      html += `
+        <div class="highlight-row">
+          <span class="color-dot" style="background-color: ${color}; color: ${color};"></span>
+          <input type="text" class="highlight-input" data-index="${i}" value="${escapeHTML(h.text)}" placeholder="Enter regex pattern (e.g. error\\w*)..." />
+          <button class="${pinClass}" data-index="${i}" title="${h.pinned ? 'Pinned (persisted)' : 'Unpinned (session only)'}">📌</button>
+        </div>
+      `;
+    }
+    grid.innerHTML = html;
+    
+    // Add input listeners
+    const inputs = grid.querySelectorAll('.highlight-input');
+    inputs.forEach(input => {
+      input.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.index, 10);
+        const val = e.target.value;
+        STATE.multiHighlights[idx].text = val;
+        
+        if (STATE.multiHighlights[idx].pinned) {
+          saveMultiHighlightsToStorage();
+        }
+        render();
+      });
+    });
+    
+    // Add pin listeners
+    const pins = grid.querySelectorAll('.highlight-pin-btn');
+    pins.forEach(pin => {
+      pin.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const idx = parseInt(btn.dataset.index, 10);
+        STATE.multiHighlights[idx].pinned = !STATE.multiHighlights[idx].pinned;
+        
+        if (STATE.multiHighlights[idx].pinned) {
+          btn.classList.add('active');
+          btn.title = "Pinned (persisted)";
+        } else {
+          btn.classList.remove('active');
+          btn.title = "Unpinned (session only)";
+        }
+        
+        saveMultiHighlightsToStorage();
+      });
+    });
+  }
+
+  function saveMultiHighlightsToStorage() {
+    chrome.storage.local.set({ multiHighlights: STATE.multiHighlights });
+  }
 
 })();
 

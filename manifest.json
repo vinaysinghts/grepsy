@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Logify",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "High-performance interactive log viewer with virtual scrolling, bookmarks, and regex filtering.",
   "permissions": [
     "storage",

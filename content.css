@@ -90,7 +90,7 @@
 #logify-search {
   width: 100%;
   height: 22px;
-  padding: 0 44px 0 8px;
+  padding: 0 64px 0 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
@@ -115,6 +115,97 @@
   gap: 2px;
 }
 
+.preset-dropdown-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+#preset-trigger {
+  font-size: 0.72rem !important;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+  height: 22px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+#preset-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+#preset-trigger.active {
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.preset-menu {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  background: rgba(10, 11, 13, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  max-width: 240px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preset-menu.hidden {
+  display: none;
+}
+
+.preset-menu-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.preset-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.preset-item-name {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #e2e8f0;
+}
+
+.preset-item-query {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'Fira Code', 'Fira Mono', monospace;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+
+
 .toggle-btn {
   background: transparent;
   border: none;
@@ -130,6 +221,12 @@
   justify-content: center;
   transition: all 0.15s ease;
   box-sizing: border-box;
+}
+
+.toggle-btn svg {
+  width: 9px;
+  height: 9px;
+  display: block;
 }
 
 .toggle-btn:hover {
@@ -244,9 +341,9 @@
 }
 
 .nav-arrow {
-  width: 20px !important;
+  min-width: 20px !important;
   height: 20px !important;
-  padding: 0 !important;
+  padding: 0 4px !important;
   font-size: 0.65rem !important;
   display: flex;
   align-items: center;
@@ -256,17 +353,45 @@
   color: rgba(255, 255, 255, 0.4) !important;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.1s ease;
-}
-
-.nav-arrow:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #ffffff !important;
+  transition: all 0.12s ease;
 }
 
 .nav-arrow:disabled {
-  opacity: 0.25;
+  opacity: 0.22 !important;
   cursor: not-allowed;
+  color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Error cycling mode colors (when unfiltered) */
+.nav-group.nav-mode-error .nav-arrow {
+  color: rgba(239, 68, 68, 0.65) !important;
+}
+.nav-group.nav-mode-error .nav-arrow:hover:not(:disabled) {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.14) !important;
+}
+
+/* Search cycling mode colors (when filtered) */
+.nav-group.nav-mode-search {
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  background: rgba(59, 130, 246, 0.03) !important;
+  transition: all 0.15s ease;
+}
+.nav-group.nav-mode-search .nav-arrow {
+  color: rgba(59, 130, 246, 0.65) !important;
+}
+.nav-group.nav-mode-search .nav-arrow:hover:not(:disabled) {
+  color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.14) !important;
+}
+
+/* Bookmark navigation colors */
+.nav-group:has(.bookmarks) .nav-arrow {
+  color: rgba(59, 130, 246, 0.65) !important;
+}
+.nav-group:has(.bookmarks) .nav-arrow:hover:not(:disabled) {
+  color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.14) !important;
 }
 
 /* Taskbar Right: Bookmarks & Controls */
@@ -360,6 +485,8 @@
   width: 100%;
   left: 0;
   top: 0;
+  padding-bottom: 120px;
+  box-sizing: border-box;
 }
 
 /* Raw Non-Virtualized Layout Support */
@@ -379,7 +506,7 @@
   align-items: stretch;
   height: 22px;
   line-height: 22px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
+  font-family: 'Fira Code', 'Fira Mono', 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
   font-size: 13px;
   background-color: #000000;
   width: 100%;
@@ -487,6 +614,7 @@
   font-family: system-ui, sans-serif;
   font-weight: bold;
   font-size: 0.75rem;
+  width: 24px !important;
 }
 
 .gutter-btn.json-btn.has-json {
@@ -518,6 +646,33 @@
 
 .line-number:hover {
   color: #d4d4d4;
+}
+
+/* Premium navigation line indicator (VS Code style with no layout shifts) */
+.log-row.active-nav-line {
+  background-color: rgba(59, 130, 246, 0.07) !important;
+  box-shadow: inset 3px 0 0 0 #3b82f6 !important;
+}
+
+.log-row.active-nav-line .line-number {
+  color: #3b82f6 !important;
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}
+
+.log-row.active-nav-line .log-text {
+  color: #ffffff !important;
+}
+
+/* Dimmed look for context lines in active filter mode */
+.log-row.context-line {
+  opacity: 0.45;
+  filter: grayscale(30%);
+  transition: opacity 0.12s ease;
+}
+
+.log-row.context-line:hover {
+  opacity: 0.85;
 }
 
 /* Log Line Content Text */
@@ -705,7 +860,7 @@
 .json-block-pre {
   margin: 0;
   padding: 14px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
+  font-family: 'Fira Code', 'Fira Mono', 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
   font-size: 12.5px;
   line-height: 1.5;
   overflow-x: auto;
@@ -731,4 +886,113 @@
 @keyframes scaleIn {
   from { transform: scale(0.96); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* Multi-Color Highlights Modal Overlay */
+.highlights-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  z-index: 2147483646; /* below JSON modal but above everything else */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.highlights-modal-overlay.hidden {
+  display: none !important;
+}
+
+.highlights-modal-content {
+  background: rgba(22, 22, 22, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  width: 95%;
+  max-width: 480px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(59, 130, 246, 0.1);
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.highlights-grid {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+}
+
+.highlight-row {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 6px 10px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.highlight-row:focus-within {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.02);
+}
+
+.color-dot {
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.highlight-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-family: 'Fira Code', 'Fira Mono', monospace;
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.highlight-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.78rem;
+}
+
+.highlight-pin-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 4px;
+  border-radius: 4px;
+  opacity: 0.35;
+  transition: all 0.12s ease;
+  filter: grayscale(1);
+}
+
+.highlight-pin-btn:hover {
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.highlight-pin-btn.active {
+  opacity: 1;
+  filter: grayscale(0);
+  background: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
 }

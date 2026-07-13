@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let customErrorTerms = [];
   let customWarnTerms = [];
+  let filterPresets = [];
 
   // 1. Restore saved states from local storage
   try {
@@ -15,12 +16,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       enabled: true,
       forceVirtualScroll: false,
       customErrorTerms: [],
-      customWarnTerms: []
+      customWarnTerms: [],
+      filterPresets: []
     });
     masterToggle.checked = data.enabled;
     forceVirtualToggle.checked = data.forceVirtualScroll;
     customErrorTerms = data.customErrorTerms;
     customWarnTerms = data.customWarnTerms;
+    filterPresets = data.filterPresets;
   } catch (err) {
     console.error("Failed to load settings from storage:", err);
   }
@@ -158,7 +161,65 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.key === "Enter") addTerm("warn");
   });
 
-  // Remove term handler
+  // 5. Custom Presets Management
+  const presetListEl = document.getElementById("presets-list");
+  const presetNameInput = document.getElementById("preset-name-input");
+  const presetQueryInput = document.getElementById("preset-query-input");
+  const addPresetBtn = document.getElementById("add-preset-btn");
+
+  function renderPresets() {
+    presetListEl.innerHTML = "";
+    filterPresets.forEach((preset, index) => {
+      const item = document.createElement("div");
+      item.className = "preset-item";
+      item.innerHTML = `
+        <div class="preset-info" data-idx="${index}" style="cursor: pointer; flex: 1; display: flex; flex-direction: column; overflow: hidden;" title="Click to edit preset">
+          <span class="preset-name">${preset.name}</span>
+          <span class="preset-query">${preset.query}</span>
+        </div>
+        <button class="preset-del-btn" data-idx="${index}">✕</button>
+      `;
+      presetListEl.appendChild(item);
+    });
+  }
+
+  // Initial render
+  renderPresets();
+
+  function addPreset() {
+    const name = presetNameInput.value.trim();
+    const query = presetQueryInput.value; // Keep trailing spaces!
+    if (!name || query === '') return;
+
+    const existingIdx = filterPresets.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existingIdx !== -1) {
+      // Modify query on existing preset
+      filterPresets[existingIdx].query = query;
+    } else {
+      // Add new preset (cap at 10)
+      if (filterPresets.length >= 10) {
+        alert("Maximum of 10 presets allowed.");
+        return;
+      }
+      filterPresets.push({ name, query });
+    }
+
+    chrome.storage.local.set({ filterPresets });
+
+    presetNameInput.value = "";
+    presetQueryInput.value = "";
+    renderPresets();
+  }
+
+  addPresetBtn.addEventListener("click", addPreset);
+  presetNameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addPreset();
+  });
+  presetQueryInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") addPreset();
+  });
+
+  // Remove and edit elements handlers (delegation)
   document.body.addEventListener("click", (e) => {
     if (e.target.classList.contains("remove-keyword")) {
       const type = e.target.dataset.type;
@@ -171,6 +232,22 @@ document.addEventListener("DOMContentLoaded", async () => {
         chrome.storage.local.set({ customWarnTerms });
       }
       renderKeywords();
+    } else if (e.target.classList.contains("preset-del-btn")) {
+      const idx = parseInt(e.target.dataset.idx, 10);
+      filterPresets.splice(idx, 1);
+      chrome.storage.local.set({ filterPresets });
+      renderPresets();
+    } else {
+      // Load preset for modification when clicking the info container
+      const infoEl = e.target.closest(".preset-info");
+      if (infoEl) {
+        const idx = parseInt(infoEl.dataset.idx, 10);
+        const preset = filterPresets[idx];
+        if (preset) {
+          presetNameInput.value = preset.name;
+          presetQueryInput.value = preset.query;
+        }
+      }
     }
   });
 });
