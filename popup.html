@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logify Settings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="header">
+      <div class="logo-area">
+        <span class="logo-icon">🗂️</span>
+        <h1 class="logo-text">Logify</h1>
+      </div>
+      <span class="version">v1.0.0</span>
+    </header>
+
+    <main class="settings-body">
+      <!-- Master Enable Switch -->
+      <div class="control-row glass-panel">
+        <div class="control-info">
+          <span class="control-title">Enable Logify</span>
+          <span class="control-desc">Auto-format log files on open</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="master-toggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Force Virtual Scroll Switch -->
+      <div class="control-row glass-panel">
+        <div class="control-info">
+          <span class="control-title">Force Virtual Scroll</span>
+          <span class="control-desc">Use virtual scroll for all file sizes</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="force-virtual-toggle">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <!-- Custom Highlight Keywords Section -->
+      <div class="glass-panel keywords-panel">
+        <div class="panel-section-title">Custom Highlight Keywords</div>
+        
+        <div class="keyword-sub-row">
+          <span class="sub-label">🔴 Errors:</span>
+          <div class="keyword-input-wrap">
+            <input type="text" id="add-error-input" placeholder="e.g. timeout" />
+            <button id="add-error-btn">+</button>
+          </div>
+        </div>
+        <div id="error-keywords-list" class="keywords-list"></div>
+        
+        <div class="keyword-sub-row" style="margin-top: 8px;">
+          <span class="sub-label">🟠 Warnings:</span>
+          <div class="keyword-input-wrap">
+            <input type="text" id="add-warn-input" placeholder="e.g. slow" />
+            <button id="add-warn-btn">+</button>
+          </div>
+        </div>
+        <div id="warn-keywords-list" class="keywords-list"></div>
+      </div>
+
+      <!-- Action Button -->
+      <button id="activate-tab-btn" class="action-btn">
+        <span class="btn-icon">⚡</span> Activate on This Tab
+      </button>
+
+      <!-- Status Banner -->
+      <div id="status-banner" class="status-banner hidden"></div>
+    </main>
+
+    <footer class="footer">
+      <span>Interactive Dark Theme Log Triage</span>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
