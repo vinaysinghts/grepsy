@@ -1,9 +1,15 @@
-// Logify Service Worker - background.js
+// LogLens Service Worker - background.js
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "forceActivate") {
     handleForceActivate(message.tabId)
       .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true; // Keep channel open for async response
+  } else if (message.action === "getCss") {
+    fetch(chrome.runtime.getURL("content.css"))
+      .then((res) => res.text())
+      .then((cssText) => sendResponse({ success: true, css: cssText }))
       .catch((err) => sendResponse({ success: false, error: err.message }));
     return true; // Keep channel open for async response
   }
@@ -36,7 +42,7 @@ async function handleForceActivate(tabId) {
 
   // Strict check: Must look like raw plain text or have the correct file extension/content type
   if (!isLog && !isPlain && !isRawText) {
-    throw new Error("Logify can only be applied to raw plain text, JSON, or YAML logs.");
+    throw new Error("LogLens can only be applied to raw plain text, JSON, or YAML logs.");
   }
 
   if (bodyTextLength === 0) {
@@ -47,7 +53,7 @@ async function handleForceActivate(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId: tabId },
     func: () => {
-      window.LOGIFY_FORCE_ACTIVATE = true;
+      window.LOGLENS_FORCE_ACTIVATE = true;
     }
   });
 

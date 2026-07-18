@@ -1,28 +1,51 @@
-# Logify Chrome Extension
+# LogLens Chrome Extension
 
-Logify is a high-performance, developer-focused local log viewer extension for Google Chrome. It transforms raw `.log` files loaded in the browser into an interactive, beautifully formatted, and easily navigable console UI capable of rendering millions of lines smoothly using virtual scrolling.
+LogLens is a high-performance, developer-focused local log viewer extension for Google Chrome and Chromium-based browsers (including Edge, Brave, Opera, and Vivaldi). It transforms raw `.log` files loaded in the browser into an interactive, beautifully formatted, and easily navigable console UI capable of rendering millions of lines smoothly using high-performance virtual scrolling.
 
 ---
 
-## Key Features
+## Interactive Floating Taskbar Layout
 
-*   ⚡ **Virtual Scrolling Viewport**: Handles massive logs (up to 1,000,000+ lines) at 60 FPS by rendering only visible rows on screen.
-*   🔍 **RegEx Filter & Search Toggles**: Powerful search bar with instant highlight updates, match-casing toggle, and RegEx engine active by default. Includes a vector SVG funnel toggle button to enable/disable filtering:
-    *   **Filter Enabled**: Only matching lines are shown, with collapsed context gaps.
-    *   **Filter Disabled (Search-Only Mode)**: All log lines remain visible at 100% opacity, with matches highlighted for easy scrolling.
-*   📣 **Dynamic Toast Notifications**: Informs you with responsive toast messages whenever you toggle filtering states or copy text.
-*   🏷️ **Interactive Severity Filters**: Instantly filter logs by `Error` (🔴), `Warning` (⚠️), or `Bookmarks` (⭐) severity counts.
-*   📝 **Exceptions & Traceback Highlighting**: Detects Java, Python, and JavaScript stack trace lines (e.g. `at ...`, `caused by:`, `File "...", line ...`) automatically and marks them as errors.
-*   📐 **Zero-Shift Gutter Layout**: Displays formatting tools `{}` on hover, line numbers, and the expand context button `>` (automatically hidden when filtering is disabled). 
-*   🔄 **Toggleable Gutter Context**: In Filter Mode, clicking `>` on a matching row reveals 5 lines of surrounding context above/below, changing the arrow to `▼`. Click it again to collapse it.
-*   🧭 **Down-First Navigation Groups**: Cycle through matches/errors or bookmarks. Next/Down buttons (`⤓` / `F8` / `F2`) are positioned first (on the left) to match downstream scanning ergonomics, followed by Previous/Up (`⤒` / `Shift+F8` / `Shift+F2`).
-*   ⚙️ **Custom Keyword Manager**: Click the extension popup icon in the browser toolbar to add, modify, or delete custom warning and error highlight keywords.
-*   🌈 **Multi-Color Highlights Panel**: Open the highlights overlay card (`Alt + H` or taskbar button) containing 10 inputs. Each field supports regex by default, highlights instantly in a unique vibrant color, and features a pushpin button (📌) to persist terms.
-*   📋 **Custom Filter Presets Dropdown**: Manage up to 10 custom search/filter presets inside the popup setting screen. 
-    *   **Interactive Editing**: Click any saved preset in the popup list to load its values back into the inputs for quick modifications.
-    *   **Space Preservation**: Preserves trailing and leading spaces (e.g. `'view '`) in your preset terms.
-    *   Select presets instantly using the glassmorphic taskbar dropdown to filter or highlight search terms.
-*   🎨 **Rich Minimalist Aesthetics**: Glassmorphic floating taskbar, Outfit typeface, Fira Code/Mono console fonts, and high-contrast pastel multicolor highlights for maximum readability on black layouts.
+LogLens features a glassmorphic floating taskbar at the top of the viewport. Below is a map of the control console and its interactive options:
+
+```text
++-------------------------------------------------------------------------------------------------------------------------+
+| [LogLens] Showing: X/Y  [Filter... [⧩][aA][.*]]  [📋 Presets] [⎚ Clear] [⤓][⤒] [⭐⤓][⭐⤒]  | 🔴 X  ⚠️ Y  ⭐ Z |  [⧉] [🖍️] [↩] [🪵] [✕] |
+| <-------- LEFT PANEL (Query Console & Controls) ------------------------------------> | <-- CENTER BADGES --> | <--- RIGHT UTILITIES ---> |
++-------------------------------------------------------------------------------------------------------------------------+
+```
+
+### 1. Left Panel (Query Console & Navigation)
+*   **Logo (`LogLens`)**: Brand indicator.
+*   **Lines Counter (`Showing: X / Y`)**: Placed next to the logo. Displays the number of visible lines currently showing in the viewport (`X`) out of the total parsed log lines (`Y`) in real-time.
+*   **Search Box (`[Filter... [⧩][aA][.*]]`)**: Type words or regular expressions here to instantly filter lines.
+    *   **Filter Toggle Funnel (`⧩` / SVG)**: Toggles filtering behaviour.
+        *   *Filter Enabled*: Hides non-matching lines, collapsing them into interactive context gaps.
+        *   *Filter Disabled (Search-Only Mode)*: Shows all lines at normal opacity but highlights the matches in bright colors.
+    *   **Match Case (`aA`)**: Toggles case-sensitivity for the search input.
+    *   **RegEx Mode (`.*`)**: Toggles regular expression parsing for search patterns.
+*   **Presets Menu (`📋 Presets`)**: A dropdown lists up to 10 saved filter queries. On opening, it pre-scans matching lines in the background and displays matching counts (e.g. `query (142 matches)`). Preserves leading/trailing spacing in preset terms.
+*   **Clear Button (`⎚ Clear`)**: Clears the search input and exits badge filters, returning to full log display. (Only visible when active query is present).
+*   **Match/Error Navigation (`⤓` / `⤒`)**: 
+    *   Cycle focus to the **Next** match or **Previous** match.
+    *   If the filter input is empty, these buttons default to cycling focus through **Errors** (`🔴`) in the log.
+    *   Shortcuts: `F8` (Next) / `Shift+F8` (Previous).
+*   **Bookmarks Navigation (`⭐⤓` / `⭐⤒`)**:
+    *   Cycles focus to the next/previous bookmarked log lines.
+    *   Buttons automatically light up in active blue once a bookmark is created, and disable (grey out) when bookmarks count is zero.
+    *   Shortcuts: `F2` (Next) / `Shift+F2` (Previous).
+
+### 2. Center Panel (Filter Badges)
+*   **Error Badge (`🔴 X`)**: Displays total errors found in the log (including tracebacks). Clicking it filters the viewport to show only error rows.
+*   **Warning Badge (`⚠️ Y`)**: Displays total warnings found in the log. Clicking it filters the viewport to show only warning rows.
+*   **Bookmarks Badge (`⭐ Z`)**: Displays total bookmarked rows. Clicking it filters the viewport to show only bookmarked rows.
+
+### 3. Right Panel (Utility Panel)
+*   **Copy Button (`⧉`)**: Copies all filtered lines to clipboard. (Only visible when filters are active).
+*   **Highlights Panel (`🖍️ Highlights`)**: Toggles the 10-field multi-color highlight manager. Type search patterns to assign up to 10 unique pastel colors to different keywords simultaneously. Use the pushpin (📌) button to save terms permanently. Shortcut: `Alt+H`.
+*   **Word Wrap Toggle (`↩`)**: Toggles row wrapping. When enabled, the virtual scroll adapts to dynamic row heights automatically. Shortcut: `Alt+W`.
+*   **Diagnostics Exporter (`🪵`)**: Copies a structured JSON event log of the last 200 system milestones (parsing times, search inputs, active filters, errors) to clipboard for debugging.
+*   **Restore View (`✕`)**: Exits LogLens viewer completely and restores the browser's default raw plain-text display.
 
 ---
 
@@ -49,7 +72,7 @@ Since the extension is developed locally, you can load it directly into Google C
 3. Click the **Load unpacked** button in the top-left corner.
 4. Select the extension directory:
    `C:\Users\Lenovo\Documents\vinay\projects\logify-chrome-ext`
-5. The extension is now active! The Logify logo will appear in your extensions list.
+5. The extension is now active! The LogLens logo will appear in your extensions list.
 
 ---
 
@@ -61,20 +84,4 @@ Since the extension is developed locally, you can load it directly into Google C
     *   Hover over rows and click **`{}`** to automatically format and prettify any structured bracket (`{}`, `[]`, `()`) or JSON data in a modal popup.
     *   Click **`>`** to expand context around a match, and click **`▼`** to collapse it back.
     *   Enter text/RegEx in the search box to filter rows. Use `|` (pipe) to search multiple keywords at once (each term will get a distinct pastel highlight color!).
-3. **Configure Custom Keywords**: Click the **Logify** icon in the extensions toolbar to customize which keywords should automatically highlight as errors or warnings.
-
----
-
-## File Structure
-
-```text
-├── manifest.json       # Extension metadata and permissions
-├── background.js       # Background service worker (intercepts raw text loading)
-├── content.js          # Core engine (virtual scroll viewport, parser, handlers)
-├── content.css         # Styling (viewer layouts, animations, highlights)
-├── popup.html          # Extension action popup HTML
-├── popup.js            # Keyword storage and propagation script
-├── popup.css           # Popup layout styling rules
-├── icon*.png           # Full-bleed minimalist logo assets (16, 32, 48, 128)
-└── README.md           # Documentation
-```
+3. **Configure Custom Settings**: Click the **LogLens** icon in the extensions toolbar to customize virtual scroll thresholds, warning/error keywords, and preset filters.

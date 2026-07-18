@@ -1,4 +1,4 @@
-/* Logify Viewer CSS - content.css */
+/* LogLens Viewer CSS - content.css */
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
@@ -21,8 +21,8 @@
   display: block;
 }
 
-/* Base Logify Container */
-#logify-viewer {
+/* Base LogLens Container */
+#loglens-viewer {
   font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: #000000;
   color: #d4d4d4;
@@ -37,7 +37,7 @@
 }
 
 /* Floating Taskbar */
-#logify-taskbar {
+#loglens-taskbar {
   position: absolute;
   top: 6px;
   left: 50%;
@@ -69,13 +69,27 @@
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.5px;
+  user-select: none;
+  gap: 1px;
+}
+
+.logo-grad-text {
   background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  user-select: none;
+}
+
+.logo-smiley {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-0.5px);
 }
 
 .search-wrapper {
@@ -87,7 +101,7 @@
   box-sizing: border-box;
 }
 
-#logify-search {
+#loglens-search {
   width: 100%;
   height: 22px;
   padding: 0 64px 0 8px;
@@ -102,7 +116,7 @@
   box-sizing: border-box;
 }
 
-#logify-search:focus {
+#loglens-search:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
   background: rgba(255, 255, 255, 0.06);
@@ -386,10 +400,10 @@
 }
 
 /* Bookmark navigation colors */
-.nav-group:has(.bookmarks) .nav-arrow {
+.bookmarks-nav-group.has-bookmarks .nav-arrow {
   color: rgba(59, 130, 246, 0.65) !important;
 }
-.nav-group:has(.bookmarks) .nav-arrow:hover:not(:disabled) {
+.bookmarks-nav-group.has-bookmarks .nav-arrow:hover:not(:disabled) {
   color: #3b82f6 !important;
   background: rgba(59, 130, 246, 0.14) !important;
 }
@@ -461,7 +475,7 @@
 }
 
 /* Log Viewport Layout */
-#logify-viewport {
+#loglens-viewport {
   position: absolute;
   top: 42px;
   left: 0;
@@ -472,7 +486,7 @@
   background-color: #000000;
 }
 
-#logify-spacer {
+#loglens-spacer {
   position: absolute;
   width: 100%;
   left: 0;
@@ -480,7 +494,7 @@
   pointer-events: none;
 }
 
-#logify-lines {
+#loglens-lines {
   position: absolute;
   width: 100%;
   left: 0;
@@ -496,7 +510,7 @@
   width: 100% !important;
 }
 
-.raw-layout #logify-lines {
+.raw-layout #loglens-lines {
   position: relative !important;
 }
 

@@ -1,9 +1,20 @@
-// Logify Core Engine - content.js
+// LogLens Core Engine - content.js
 
 (async function () {
   // Prevent duplicate injection
-  if (window.LOGIFY_INITIALIZED) return;
-  window.LOGIFY_INITIALIZED = true;
+  if (window.LOGLENS_INITIALIZED) return;
+  window.LOGLENS_INITIALIZED = true;
+
+  // Diagnostic Event Logging ring buffer (stores up to 200 triage events)
+  const DIAG_LOGS = [];
+  function diagLog(event, data = {}) {
+    if (DIAG_LOGS.length >= 200) {
+      DIAG_LOGS.shift();
+    }
+    DIAG_LOGS.push({ ts: new Date().toISOString(), event, data });
+  }
+
+  diagLog('init:start', { url: window.location.href, userAgent: navigator.userAgent });
 
   // 1. Severity Keywords
   const ERROR_TERMS = ['error', 'err', 'fatal', 'critical', 'fail', 'failed', 'exception', 'severe', 'emergency', 'alert', 'panic', 'abort', 'unhandled', 'uncaught', 'rejected', 'traceback'];
@@ -43,14 +54,22 @@
   // 2. Load settings from storage
   let enabled = true;
   let forceVirtualScroll = false;
+  let virtualScrollThreshold = 20000;
   let customErrorTerms = [];
   let customWarnTerms = [];
   let storedMultiHighlights = [];
   let storedFilterPresets = [];
+
+  // Cached DOM element references in IIFE scope for access across functions
+  let searchInput, presetTrigger, presetMenu, toggleFilterBtn, toggleCaseBtn, toggleRegexBtn;
+  let badgeErrors, badgeWarnings, badgeBookmarks, copyMatchesBtn, toggleHighlightsBtn, toggleWrapBtn;
+  let exportDiagBtn, restoreViewBtn, clearFiltersBtn, navTargetPrev, navTargetNext, navBookmarksPrev, navBookmarksNext;
+  let highlightsModal, closeHighlightsBtn, viewer;
   try {
     const settings = await chrome.storage.local.get({
       enabled: true,
       forceVirtualScroll: false,
+      virtualScrollThreshold: 20000,
       customErrorTerms: [],
       customWarnTerms: [],
       multiHighlights: [],
@@ -58,12 +77,15 @@
     });
     enabled = settings.enabled;
     forceVirtualScroll = settings.forceVirtualScroll;
+    virtualScrollThreshold = settings.virtualScrollThreshold || 20000;
     customErrorTerms = settings.customErrorTerms;
     customWarnTerms = settings.customWarnTerms;
     storedMultiHighlights = settings.multiHighlights || [];
     storedFilterPresets = settings.filterPresets || [];
+    diagLog('settings:loaded', { forceVirtualScroll, virtualScrollThreshold, customErrors: customErrorTerms.length, customWarns: customWarnTerms.length, presets: storedFilterPresets.length });
   } catch (err) {
-    console.warn("Logify: Storage read failed, falling back to defaults.");
+    console.warn("LogLens: Storage read failed, falling back to defaults.");
+    diagLog('error:storage-read-failed', { error: err.message });
   }
 
   // Combine default and custom terms
@@ -78,11 +100,11 @@
   const pathname = window.location.pathname.toLowerCase();
   const isLogExt = pathname.endsWith('.log');
   const isPlainText = document.contentType === 'text/plain';
-  const forceActivate = window.LOGIFY_FORCE_ACTIVATE === true;
+  const forceActivate = window.LOGLENS_FORCE_ACTIVATE === true;
 
   if (!forceActivate) {
     if (!enabled || (!isLogExt && !isPlainText)) {
-      window.LOGIFY_INITIALIZED = false;
+      window.LOGLENS_INITIALIZED = false;
       return;
     }
   }
@@ -91,15 +113,41 @@
   const originalBodyHTML = document.body.innerHTML;
   const originalBodyStyle = document.body.getAttribute('style') || '';
 
+  // 4. Create parsing progress loader screen
+  const loader = document.createElement('div');
+  loader.id = 'loglens-loader';
+  loader.style.cssText = `
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: #000000;
+    color: #3b82f6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Outfit', -apple-system, sans-serif;
+    z-index: 2147483647;
+  `;
+  loader.innerHTML = `
+    <div style="font-size: 1.6rem; font-weight: 700; margin-bottom: 8px; background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 0.5px;">LogLens</div>
+    <div style="font-size: 0.82rem; color: #718096; margin-bottom: 18px;" id="loglens-loader-status">Reading raw log files...</div>
+    <div style="width: 180px; height: 3px; background: #1a202c; border-radius: 2px; overflow: hidden; position: relative;">
+      <div id="loglens-loader-progress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #a855f7); transition: width 0.1s ease;"></div>
+    </div>
+  `;
+  document.body.appendChild(loader);
+
   // Get raw log contents
   const rawText = document.querySelector('pre')?.textContent || document.body.textContent || '';
   if (!rawText.trim()) {
-    console.warn("Logify: No text content found to format.");
-    window.LOGIFY_INITIALIZED = false;
+    console.warn("LogLens: No text content found to format.");
+    diagLog('error:no-raw-text');
+    window.LOGLENS_INITIALIZED = false;
+    loader.remove();
     return;
   }
 
-  // 4. State Management
+  // 5. State Management
   const STATE = {
     allLines: [],
     displayList: [], // array of lines/gaps
@@ -137,7 +185,6 @@
     }
   };
 
-  // 5. Pre-Analyze Log Text (V8 optimization)
   const rawLines = rawText.split(/\r?\n/);
   // Remove last empty line if file ends in newline
   if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') {
@@ -146,207 +193,269 @@
 
   STATE.stats.total = rawLines.length;
   STATE.allLines = new Array(rawLines.length);
+  STATE.isVirtual = STATE.stats.total >= virtualScrollThreshold || forceVirtualScroll;
 
-  for (let i = 0; i < rawLines.length; i++) {
-    const text = rawLines[i];
-    const isStackTrace = traceRegex.test(text) || pythonTraceHeader.test(text) || pythonTraceLine.test(text) || causedByRegex.test(text);
-    const isError = isStackTrace || errorRegex.test(text);
-    const isWarning = !isError && warnRegex.test(text); // Error takes precedence
+  const statusText = loader.querySelector('#loglens-loader-status');
+  const progressBar = loader.querySelector('#loglens-loader-progress');
 
-    // Check for standard JSON or custom bracketed structures ({}, [], or ())
-    const hasJson = (text.indexOf('{') !== -1 && text.indexOf('}') !== -1) ||
-      (text.indexOf('[') !== -1 && text.indexOf(']') !== -1) ||
-      (text.indexOf('(') !== -1 && text.indexOf(')') !== -1);
+  let lineIndex = 0;
+  const parseChunkSize = 8000; // Batch of 8K lines yields smooth UX repaint intervals
 
-    if (isError) STATE.stats.errors++;
-    if (isWarning) STATE.stats.warnings++;
-    if (hasJson) STATE.stats.hasAnyJson = true;
+  function parseNextChunk() {
+    const chunkEnd = Math.min(rawLines.length, lineIndex + parseChunkSize);
+    statusText.textContent = `Analyzing: ${lineIndex.toLocaleString()} / ${rawLines.length.toLocaleString()} lines`;
+    progressBar.style.width = `${Math.min(100, Math.floor((lineIndex / rawLines.length) * 100))}%`;
 
-    STATE.allLines[i] = {
-      text: text,
-      originalIndex: i + 1,
-      isError: isError,
-      isWarning: isWarning,
-      hasJson: hasJson
-    };
+    for (; lineIndex < chunkEnd; lineIndex++) {
+      const text = rawLines[lineIndex];
+      const isStackTrace = traceRegex.test(text) || pythonTraceHeader.test(text) || pythonTraceLine.test(text) || causedByRegex.test(text);
+      const isError = isStackTrace || errorRegex.test(text);
+      const isWarning = !isError && warnRegex.test(text);
+
+      // Check for JSON/bracket occurrences
+      const hasJson = (text.indexOf('{') !== -1 && text.indexOf('}') !== -1) ||
+        (text.indexOf('[') !== -1 && text.indexOf(']') !== -1) ||
+        (text.indexOf('(') !== -1 && text.indexOf(')') !== -1);
+
+      if (isError) STATE.stats.errors++;
+      if (isWarning) STATE.stats.warnings++;
+      if (hasJson) STATE.stats.hasAnyJson = true;
+
+      STATE.allLines[lineIndex] = {
+        text: text,
+        originalIndex: lineIndex + 1,
+        isError: isError,
+        isWarning: isWarning,
+        hasJson: hasJson
+      };
+    }
+
+    if (lineIndex < rawLines.length) {
+      setTimeout(parseNextChunk, 0);
+    } else {
+      diagLog('init:parse-complete', { total: STATE.stats.total, errors: STATE.stats.errors, warnings: STATE.stats.warnings, isVirtual: STATE.isVirtual });
+      finishInitialization();
+    }
   }
 
-  // Establish rendering mode threshold
-  STATE.isVirtual = STATE.stats.total >= 100000 || forceVirtualScroll;
+  // Start the chunked parsing process
+  parseNextChunk();
 
-  // Clear document body & prep container (lock html & body heights/overflows to prevent outer page scrolling on Ctrl+End)
-  document.documentElement.setAttribute('style', 'margin:0; padding:0; overflow:hidden !important; height:100% !important; width:100% !important;');
-  document.body.innerHTML = '';
-  document.body.setAttribute('style', 'margin:0; padding:0; overflow:hidden !important; height:100% !important; width:100% !important; background-color:#000000;');
+  function finishInitialization() {
+    // Remove the loader overlay
+    loader.remove();
 
-  // Create Shadow Host & Attach Shadow DOM (Isolation)
-  const host = document.createElement('div');
-  host.id = 'logify-host';
-  document.body.appendChild(host);
-  STATE.shadowRoot = host.attachShadow({ mode: 'open' });
+    // Clear document body & lock scroll variables
+    document.documentElement.setAttribute('style', 'margin:0; padding:0; overflow:hidden !important; height:100% !important; width:100% !important;');
+    document.body.innerHTML = '';
+    document.body.setAttribute('style', 'margin:0; padding:0; overflow:hidden !important; height:100% !important; width:100% !important; background-color:#000000;');
 
-  // 6. Build UI inside Shadow DOM
-  const viewer = document.createElement('div');
-  viewer.id = 'logify-viewer';
-  viewer.innerHTML = `
-    <!-- Floating Minimalist Taskbar -->
-    <div id="logify-taskbar">
-      <div class="taskbar-left">
-        <span class="logo">Logify</span>
-        <div class="search-wrapper">
-          <input type="text" id="logify-search" placeholder="Filter lines with regex or use | for multiple terms" />
-          <div class="search-toggles">
-            <button id="toggle-filter" class="toggle-btn active" title="Filter Matches (show matching lines only)">
-              <svg class="toggle-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-              </svg>
-            </button>
-            <button id="toggle-case" class="toggle-btn" title="Match Case (aA)">aA</button>
-            <button id="toggle-regex" class="toggle-btn active" title="Use Regular Expression (.*)">.*</button>
+    // Create Shadow Host & Attach Shadow DOM
+    const host = document.createElement('div');
+    host.id = 'loglens-host';
+    document.body.appendChild(host);
+    STATE.shadowRoot = host.attachShadow({ mode: 'open' });
+
+    // 6. Build UI inside Shadow DOM
+    viewer = document.createElement('div');
+    viewer.id = 'loglens-viewer';
+    viewer.innerHTML = `
+      <!-- Floating Minimalist Taskbar -->
+      <div id="loglens-taskbar">
+        <div class="taskbar-left">
+          <span class="logo"><span class="logo-grad-text">L</span><svg class="logo-smiley" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="logo-smiley-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3b82f6"></stop><stop offset="100%" stop-color="#a855f7"></stop></linearGradient></defs><circle cx="10" cy="10" r="7" stroke="url(#logo-smiley-grad)"></circle><path d="M15 15l5.5 5.5" stroke="url(#logo-smiley-grad)"></path><circle cx="8" cy="9" r="0.8" fill="url(#logo-smiley-grad)" stroke="none"></circle><circle cx="12" cy="9" r="0.8" fill="url(#logo-smiley-grad)" stroke="none"></circle><path d="M7.5 12.2 Q 10 14.2 12.5 12.2" stroke="url(#logo-smiley-grad)" stroke-width="1.8"></path></svg><span class="logo-grad-text">gLens</span></span>
+          <span class="total-lines-text" id="loglens-lines-counter">Showing: ${STATE.stats.total.toLocaleString()} / ${STATE.stats.total.toLocaleString()}</span>
+          <div class="search-wrapper">
+            <input type="text" id="loglens-search" placeholder="Filter lines with regex or use | for multiple terms" />
+            <div class="search-toggles">
+              <button id="toggle-filter" class="toggle-btn active" title="Filter Matches (show matching lines only)">
+                <svg class="toggle-icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                </svg>
+              </button>
+              <button id="toggle-case" class="toggle-btn" title="Match Case (aA)">aA</button>
+              <button id="toggle-regex" class="toggle-btn active" title="Use Regular Expression (.*)">.*</button>
+            </div>
+          </div>
+          <div class="preset-dropdown-wrapper">
+            <button id="preset-trigger" class="taskbar-btn" title="Filter Presets">📋 Presets</button>
+            <div id="preset-menu" class="preset-menu hidden"></div>
+          </div>
+          <button id="clear-filters-btn" class="taskbar-btn hidden" title="Clear Filters (Esc)">⎚ Clear</button>
+          
+          <!-- Match/Error Navigation Group -->
+          <div id="nav-group-errors" class="nav-group nav-mode-error">
+            <button id="nav-target-next" class="taskbar-btn nav-arrow" title="Next Match/Error (F8)">⤓</button>
+            <button id="nav-target-prev" class="taskbar-btn nav-arrow" title="Previous Match/Error (Shift+F8)">⤒</button>
+          </div>
+
+          <!-- Bookmarks Navigation Group -->
+          <div class="nav-group bookmarks-nav-group">
+            <button id="nav-bookmarks-next" class="taskbar-btn nav-arrow" disabled title="Next Bookmark (F2)">⭐⤓</button>
+            <button id="nav-bookmarks-prev" class="taskbar-btn nav-arrow" disabled title="Previous Bookmark (Shift+F2)">⭐⤒</button>
           </div>
         </div>
-        <div class="preset-dropdown-wrapper">
-          <button id="preset-trigger" class="taskbar-btn" title="Filter Presets">📋 Presets</button>
-          <div id="preset-menu" class="preset-menu hidden"></div>
-        </div>
-        <button id="clear-filters-btn" class="taskbar-btn hidden" title="Clear Filters (Esc)">⎚ Clear</button>
-        <span class="total-lines-text">Total: ${STATE.stats.total.toLocaleString()}</span>
-      </div>
-      
-      <div class="taskbar-center">
-        <!-- Error Navigation Group -->
-        <div id="nav-group-errors" class="nav-group nav-mode-error">
+        
+        <div class="taskbar-center">
           <button id="badge-errors" class="stat-badge errors" title="Toggle Error Filter">
             🔴 ${STATE.stats.errors}
           </button>
-          <button id="nav-target-next" class="taskbar-btn nav-arrow" title="Next Error (F8)">🔴 ⤓</button>
-          <button id="nav-target-prev" class="taskbar-btn nav-arrow" title="Previous Error (Shift+F8)">🔴 ⤒</button>
-        </div>
-
-        <!-- Warning Filter Badge (High-highlighting warning symbol) -->
-        <button id="badge-warnings" class="stat-badge warnings" title="Toggle Warning Filter">
-          ⚠️ ${STATE.stats.warnings}
-        </button>
-
-        <!-- Bookmark Navigation Group -->
-        <div class="nav-group">
+          <button id="badge-warnings" class="stat-badge warnings" title="Toggle Warning Filter">
+            ⚠️ ${STATE.stats.warnings}
+          </button>
           <button id="badge-bookmarks" class="stat-badge bookmarks" title="Toggle Bookmarks Filter">
             ⭐ 0
           </button>
-          <button id="nav-bookmarks-next" class="taskbar-btn nav-arrow" disabled title="Next Bookmark (F2)">⤓</button>
-          <button id="nav-bookmarks-prev" class="taskbar-btn nav-arrow" disabled title="Previous Bookmark (Shift+F2)">⤒</button>
+        </div>
+
+        <div class="taskbar-right">
+          <button id="copy-matches-btn" class="taskbar-btn hidden" title="Copy Filtered Lines">⧉</button>
+          <button id="toggle-highlights-btn" class="taskbar-btn" title="Multi-Color Highlights (Alt+H)">🖍️ Highlights</button>
+          <button id="toggle-wrap-btn" class="taskbar-btn" title="Toggle Word Wrap (Alt+W)">↩</button>
+          <button id="export-diag-btn" class="taskbar-btn" title="Export Diagnostics Logs for Triage">🪵</button>
+          <button id="restore-view-btn" class="taskbar-btn close-btn" title="Close LogLens & Restore Raw View">✕</button>
         </div>
       </div>
 
-      <div class="taskbar-right">
-        <button id="copy-matches-btn" class="taskbar-btn hidden" title="Copy Filtered Lines">⧉</button>
-        <button id="toggle-highlights-btn" class="taskbar-btn" title="Multi-Color Highlights (Alt+H)">🖍️ Highlights</button>
-        <button id="toggle-wrap-btn" class="taskbar-btn" title="Toggle Word Wrap (Alt+W)">↩</button>
-        <button id="restore-view-btn" class="taskbar-btn close-btn" title="Close Logify & Restore Raw View">✕</button>
+      <!-- Scrollable Viewport -->
+      <div id="loglens-viewport" class="${STATE.isVirtual ? '' : 'raw-layout'}">
+        <div id="loglens-spacer"></div>
+        <div id="loglens-lines"></div>
       </div>
-    </div>
 
-    <!-- Scrollable Viewport -->
-    <div id="logify-viewport" class="${STATE.isVirtual ? '' : 'raw-layout'}">
-      <div id="logify-spacer"></div>
-      <div id="logify-lines"></div>
-    </div>
-
-    <!-- Multi-Color Highlights Modal Overlay -->
-    <div id="highlights-modal" class="highlights-modal-overlay hidden">
-      <div class="highlights-modal-content">
-        <div class="modal-header">
-          <span class="modal-title">🌈 Multi-Color Highlights</span>
-          <button class="modal-close" id="close-highlights-btn">✕</button>
-        </div>
-        <div id="highlights-grid" class="highlights-grid">
-          <!-- 10 rows generated dynamically -->
+      <!-- Multi-Color Highlights Modal Overlay -->
+      <div id="highlights-modal" class="highlights-modal-overlay hidden">
+        <div class="highlights-modal-content">
+          <div class="modal-header">
+            <span class="modal-title">🌈 Multi-Color Highlights</span>
+            <button class="modal-close" id="close-highlights-btn">✕</button>
+          </div>
+          <div id="highlights-grid" class="highlights-grid">
+            <!-- 10 rows generated dynamically -->
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Toast Notifications Container -->
-    <div id="logify-toast-container" style="position:fixed; bottom:20px; right:20px; z-index:2147483647; display:flex; flex-direction:column; gap:10px;"></div>
-  `;
+      <!-- Toast Notifications Container -->
+      <div id="loglens-toast-container" style="position:fixed; bottom:20px; right:20px; z-index:2147483647; display:flex; flex-direction:column; gap:10px;"></div>
+    `;
 
-  // Inject Styles directly into Shadow DOM via link tag (bypasses CORS/CSP fetch constraints)
-  const styleLink = document.createElement('link');
-  styleLink.rel = 'stylesheet';
-  styleLink.href = chrome.runtime.getURL('content.css');
+    // Hide viewer element until style is loaded to prevent FOUC
+    const hideStyle = document.createElement('style');
+    hideStyle.textContent = '#loglens-viewer { display: none !important; }';
+    STATE.shadowRoot.appendChild(hideStyle);
 
-  // Hide viewer element until style is loaded to prevent FOUC (Flash of Unstyled Content)
-  const hideStyle = document.createElement('style');
-  hideStyle.textContent = '#logify-viewer { display: none !important; }';
-  STATE.shadowRoot.appendChild(hideStyle);
+    // Inject Styles directly into Shadow DOM via style tag (bypasses CORS/CSP fetch constraints on file:/// URLs)
+    const styleEl = document.createElement('style');
 
-  styleLink.onload = () => {
-    hideStyle.remove();
-  };
-  // Fallback in case onload does not trigger
-  setTimeout(() => {
-    if (hideStyle.parentNode) hideStyle.remove();
-  }, 250);
-
-  STATE.shadowRoot.appendChild(styleLink);
-  STATE.shadowRoot.appendChild(viewer);
-
-
-
-  // Cache elements
-  STATE.scrollContainer = STATE.shadowRoot.getElementById('logify-viewport');
-  STATE.linesContainer = STATE.shadowRoot.getElementById('logify-lines');
-
-  const searchInput = STATE.shadowRoot.getElementById('logify-search');
-  const presetTrigger = STATE.shadowRoot.getElementById('preset-trigger');
-  const presetMenu = STATE.shadowRoot.getElementById('preset-menu');
-  const toggleFilterBtn = STATE.shadowRoot.getElementById('toggle-filter');
-  const toggleCaseBtn = STATE.shadowRoot.getElementById('toggle-case');
-  const toggleRegexBtn = STATE.shadowRoot.getElementById('toggle-regex');
-  const badgeErrors = STATE.shadowRoot.getElementById('badge-errors');
-  const badgeWarnings = STATE.shadowRoot.getElementById('badge-warnings');
-  const badgeBookmarks = STATE.shadowRoot.getElementById('badge-bookmarks');
-  const copyMatchesBtn = STATE.shadowRoot.getElementById('copy-matches-btn');
-  const toggleHighlightsBtn = STATE.shadowRoot.getElementById('toggle-highlights-btn');
-  const toggleWrapBtn = STATE.shadowRoot.getElementById('toggle-wrap-btn');
-  const restoreViewBtn = STATE.shadowRoot.getElementById('restore-view-btn');
-  const clearFiltersBtn = STATE.shadowRoot.getElementById('clear-filters-btn');
-
-  const navTargetPrev = STATE.shadowRoot.getElementById('nav-target-prev');
-  const navTargetNext = STATE.shadowRoot.getElementById('nav-target-next');
-  const navBookmarksPrev = STATE.shadowRoot.getElementById('nav-bookmarks-prev');
-  const navBookmarksNext = STATE.shadowRoot.getElementById('nav-bookmarks-next');
-
-  const highlightsModal = STATE.shadowRoot.getElementById('highlights-modal');
-  const closeHighlightsBtn = STATE.shadowRoot.getElementById('close-highlights-btn');
-
-  function updatePresetDropdown() {
-    if (!presetMenu) return;
-    presetMenu.innerHTML = '';
-    console.log("Logify Presets Loaded:", STATE.filterPresets);
-    
-    const defaultItem = document.createElement('div');
-    defaultItem.className = 'preset-menu-item';
-    defaultItem.dataset.value = '';
-    defaultItem.innerHTML = `<span class="preset-item-name">-- No Preset --</span>`;
-    presetMenu.appendChild(defaultItem);
-
-    STATE.filterPresets.forEach(preset => {
-      const item = document.createElement('div');
-      item.className = 'preset-menu-item';
-      item.dataset.value = preset.query;
-      item.innerHTML = `
-        <span class="preset-item-name">${preset.name}</span>
-        <span class="preset-item-query">${preset.query}</span>
-      `;
-      presetMenu.appendChild(item);
+    chrome.runtime.sendMessage({ action: 'getCss' }, (response) => {
+      if (response && response.success && response.css) {
+        styleEl.textContent = response.css;
+        diagLog('css:injected', { source: 'ipc' });
+      } else {
+        console.warn("LogLens: Failed to load extension CSS via IPC. Falling back to fetch.");
+        fetch(chrome.runtime.getURL('content.css'))
+          .then(r => r.text())
+          .then(css => {
+            styleEl.textContent = css;
+            diagLog('css:injected', { source: 'fetch-fallback' });
+          })
+          .catch(err => {
+            console.error("LogLens: Fallback fetch also failed.", err);
+            diagLog('error:css-injection-failed', { error: err.message });
+          });
+      }
+      // Remove FOUC blocker
+      if (hideStyle.parentNode) hideStyle.remove();
     });
-  }
 
-  // Initialize display list and built dynamic panels
-  buildHighlightsPanel();
-  updatePresetDropdown();
-  computeDisplayList();
-  render();
+    STATE.shadowRoot.appendChild(styleEl);
+    STATE.shadowRoot.appendChild(viewer);
+
+    // Cache elements
+    STATE.scrollContainer = STATE.shadowRoot.getElementById('loglens-viewport');
+    STATE.linesContainer = STATE.shadowRoot.getElementById('loglens-lines');
+
+    searchInput = STATE.shadowRoot.getElementById('loglens-search');
+    presetTrigger = STATE.shadowRoot.getElementById('preset-trigger');
+    presetMenu = STATE.shadowRoot.getElementById('preset-menu');
+    toggleFilterBtn = STATE.shadowRoot.getElementById('toggle-filter');
+    toggleCaseBtn = STATE.shadowRoot.getElementById('toggle-case');
+    toggleRegexBtn = STATE.shadowRoot.getElementById('toggle-regex');
+    badgeErrors = STATE.shadowRoot.getElementById('badge-errors');
+    badgeWarnings = STATE.shadowRoot.getElementById('badge-warnings');
+    badgeBookmarks = STATE.shadowRoot.getElementById('badge-bookmarks');
+    copyMatchesBtn = STATE.shadowRoot.getElementById('copy-matches-btn');
+    toggleHighlightsBtn = STATE.shadowRoot.getElementById('toggle-highlights-btn');
+    toggleWrapBtn = STATE.shadowRoot.getElementById('toggle-wrap-btn');
+    exportDiagBtn = STATE.shadowRoot.getElementById('export-diag-btn');
+    restoreViewBtn = STATE.shadowRoot.getElementById('restore-view-btn');
+    clearFiltersBtn = STATE.shadowRoot.getElementById('clear-filters-btn');
+
+    navTargetPrev = STATE.shadowRoot.getElementById('nav-target-prev');
+    navTargetNext = STATE.shadowRoot.getElementById('nav-target-next');
+    navBookmarksPrev = STATE.shadowRoot.getElementById('nav-bookmarks-prev');
+    navBookmarksNext = STATE.shadowRoot.getElementById('nav-bookmarks-next');
+
+    highlightsModal = STATE.shadowRoot.getElementById('highlights-modal');
+    closeHighlightsBtn = STATE.shadowRoot.getElementById('close-highlights-btn');
+
+    function updatePresetDropdown() {
+      if (!presetMenu) return;
+      presetMenu.innerHTML = '';
+
+      const defaultItem = document.createElement('div');
+      defaultItem.className = 'preset-menu-item';
+      defaultItem.dataset.value = '';
+
+      const defaultSpan = document.createElement('span');
+      defaultSpan.className = 'preset-item-name';
+      defaultSpan.textContent = '-- No Preset --';
+
+      defaultItem.appendChild(defaultSpan);
+      presetMenu.appendChild(defaultItem);
+
+      STATE.filterPresets.forEach(preset => {
+        const item = document.createElement('div');
+        item.className = 'preset-menu-item';
+        item.dataset.value = preset.query;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'preset-item-name';
+        nameSpan.textContent = preset.name;
+
+        const querySpan = document.createElement('span');
+        querySpan.className = 'preset-item-query';
+
+        // Pre-scan matched counts for each preset
+        let count = 0;
+        if (preset.query) {
+          try {
+            const tester = new RegExp(preset.query, STATE.caseSensitive ? 'i' : 'gi');
+            for (let i = 0; i < STATE.allLines.length; i++) {
+              if (tester.test(STATE.allLines[i].text)) {
+                count++;
+              }
+            }
+          } catch (e) {
+            diagLog('error:preset-scan-regex-failed', { name: preset.name, query: preset.query, error: e.message });
+          }
+        }
+
+        querySpan.textContent = `${preset.query} (${count.toLocaleString()} matches)`;
+
+        item.appendChild(nameSpan);
+        item.appendChild(querySpan);
+        presetMenu.appendChild(item);
+      });
+    }
+
+    // Initialize display list and built dynamic panels
+    buildHighlightsPanel();
+    updatePresetDropdown();
+    computeDisplayList();
+    render();
+  }
 
   // Multi-Color Highlights Modal handlers
   toggleHighlightsBtn.addEventListener('click', () => {
@@ -620,8 +729,42 @@
   restoreViewBtn.addEventListener('click', () => {
     document.body.innerHTML = originalBodyHTML;
     document.body.setAttribute('style', originalBodyStyle);
-    window.LOGIFY_INITIALIZED = false;
+    window.LOGLENS_INITIALIZED = false;
   });
+
+  // Export diagnostic logs to clipboard for triage
+  exportDiagBtn.addEventListener('click', () => {
+    diagLog('action:export-diagnostics', { diagCount: DIAG_LOGS.length });
+    const logString = JSON.stringify(DIAG_LOGS, null, 2);
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(logString)
+        .then(() => showToast("Diagnostics logs copied to clipboard! Ready to share."))
+        .catch((err) => {
+          diagLog('error:clipboard-write-failed', { error: err.message });
+          copyFallback(logString);
+        });
+    } else {
+      copyFallback(logString);
+    }
+  });
+
+  function copyFallback(text) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      textarea.remove();
+      showToast("Diagnostics logs copied to clipboard! Ready to share.");
+    } catch (e) {
+      console.error("LogLens: Fallback copy failed.", e);
+      showToast("Failed to copy diagnostics.");
+    }
+  }
 
   // Target navigation & cycling (Errors / matches F8 / Shift+F8)
   navTargetPrev.addEventListener('click', () => {
@@ -792,6 +935,12 @@
       }
     }
 
+    // Sync bookmarks nav group class for compatibility (replaces CSS :has() dependency)
+    const navBookmarksGroup = STATE.shadowRoot.querySelector('.bookmarks-nav-group');
+    if (navBookmarksGroup) {
+      navBookmarksGroup.classList.toggle('has-bookmarks', STATE.bookmarks.size > 0);
+    }
+
     if (!isFiltered) {
       // Map all lines directly
       for (let i = 0; i < STATE.allLines.length; i++) {
@@ -805,6 +954,13 @@
         navTargetNext.title = "Next Error (F8)";
       }
       STATE.displayList = list;
+
+      const counterEl = STATE.shadowRoot.getElementById('loglens-lines-counter');
+      if (counterEl) {
+        counterEl.textContent = ` ${STATE.allLines.length.toLocaleString()} / ${STATE.allLines.length.toLocaleString()}`;
+      }
+
+      diagLog('filter:clear', { total: STATE.allLines.length });
       return;
     }
 
@@ -871,12 +1027,24 @@
         list.push({ type: 'line', line: STATE.allLines[i] });
       }
       STATE.displayList = list;
+
+      const counterEl = STATE.shadowRoot.getElementById('loglens-lines-counter');
+      if (counterEl) {
+        counterEl.textContent = ` ${STATE.allLines.length.toLocaleString()} / ${STATE.allLines.length.toLocaleString()} (${matches.length.toLocaleString()} matched)`;
+      }
+
+      diagLog('filter:disabled', { matchedCount: matches.length, total: STATE.allLines.length, filterMode: STATE.filterMode, query });
       return;
     }
 
     // Construct the display list WITHOUT Gaps initially (filtered lines show one after another)
     if (matches.length === 0) {
       STATE.displayList = [];
+      const counterEl = STATE.shadowRoot.getElementById('loglens-lines-counter');
+      if (counterEl) {
+        counterEl.textContent = ` 0 / ${STATE.allLines.length.toLocaleString()}`;
+      }
+      diagLog('filter:applied', { matchedCount: 0, total: STATE.allLines.length, filterMode: STATE.filterMode, query });
       return;
     }
 
@@ -895,6 +1063,15 @@
         }
       }
     }
+
+    const counterEl = STATE.shadowRoot.getElementById('loglens-lines-counter');
+    if (counterEl) {
+      // displayList.length is the correct "showing" count since context expansions append rows to the list!
+      counterEl.textContent = `
+       ${STATE.displayList.length.toLocaleString()} / ${STATE.allLines.length.toLocaleString()}`;
+    }
+
+    diagLog('filter:applied', { matchedCount: matches.length, showingCount: STATE.displayList.length, total: STATE.allLines.length, filterMode: STATE.filterMode, query });
   }
 
   // Splicing/expanding gap nodes
@@ -1047,6 +1224,10 @@
       navBookmarksPrev.disabled = size === 0;
       navBookmarksNext.disabled = size === 0;
     }
+    const navBookmarksGroup = STATE.shadowRoot.querySelector('.bookmarks-nav-group');
+    if (navBookmarksGroup) {
+      navBookmarksGroup.classList.toggle('has-bookmarks', size > 0);
+    }
 
     // If currently filtered by bookmarks, we need to update the display list and render
     if (STATE.filterMode === 'bookmarks') {
@@ -1109,14 +1290,16 @@
     const totalHeight = (totalLinesCount * STATE.LINE_HEIGHT) + 120;
 
     // Adjust scrollable spacer height
-    const spacer = STATE.shadowRoot.getElementById('logify-spacer');
-    spacer.style.height = `${totalHeight}px`;
+    const spacer = STATE.shadowRoot.getElementById('loglens-spacer');
+    if (spacer) {
+      spacer.style.height = `${totalHeight}px`;
+    }
 
     // Determine slice indices
     let startIdx = Math.max(0, Math.floor(scrollTop / STATE.LINE_HEIGHT) - STATE.OVERSCAN);
     let endIdx = Math.min(totalLinesCount - 1, Math.floor((scrollTop + viewportHeight) / STATE.LINE_HEIGHT) + STATE.OVERSCAN);
 
-    // Position lines absolute container
+    // Position lines container. In flow-wrap mode, we translate the container to the topOffset of the first visible row.
     STATE.linesContainer.style.transform = `translateY(${startIdx * STATE.LINE_HEIGHT}px)`;
 
     const query = STATE.searchQuery;
@@ -1136,12 +1319,21 @@
       const item = STATE.displayList[i];
       const topOffset = (i - startIdx) * STATE.LINE_HEIGHT;
 
+      // Handle custom relative placement inline style configurations during wrap
+      const positionStyle = STATE.globalWrap
+        ? `position:relative; min-height:${STATE.LINE_HEIGHT}px;`
+        : `position:absolute; top:${topOffset}px; height:${STATE.LINE_HEIGHT}px;`;
+
       if (item.type === 'gap') {
         const hiddenCount = (item.end - item.start + 1);
         const mode = item.direction === 'above' ? 'bottom' : 'top';
         const label = item.direction === 'above' ? '↑ Show More' : '↓ Show More';
+        const gapPositionStyle = STATE.globalWrap
+          ? `position:relative; height:${STATE.LINE_HEIGHT}px;`
+          : `position:absolute; top:${topOffset}px; height:${STATE.LINE_HEIGHT}px;`;
+
         html += `
-          <div class="gap-row" style="position:absolute; top:${topOffset}px; height:${STATE.LINE_HEIGHT}px;">
+          <div class="gap-row" style="${gapPositionStyle}">
             <div class="gap-container">
               <span class="gap-info">⤜ ${hiddenCount.toLocaleString()} hidden ⤛</span>
               <button class="gap-btn show-more" data-gap-start="${item.start}" data-gap-end="${item.end}" data-mode="${mode}">${label}</button>
@@ -1184,7 +1376,7 @@
         html += `
           <div class="log-row ${wrapClass} ${errorClass} ${warnClass} ${bookmarkClass} ${expandedClass} ${activeNavClass} ${matchClass}" 
                data-orig-idx="${origIdx}"
-               style="position:absolute; top:${topOffset}px; min-height:${STATE.LINE_HEIGHT}px;">
+               style="${positionStyle}">
             <div class="log-gutter">
               <button class="gutter-btn json-btn ${line.hasJson ? 'has-json' : ''}" 
                       data-line-index="${origIdx}" 
@@ -1203,11 +1395,13 @@
     STATE.linesContainer.innerHTML = html;
   }
 
-  // Non-virtualized layout loading (under 100K lines)
+  // Non-virtualized layout loading (under 20K lines)
   function renderRaw() {
     // Spacer height is irrelevant in raw layout
-    const spacer = STATE.shadowRoot.getElementById('logify-spacer');
-    spacer.style.height = '0px';
+    const spacer = STATE.shadowRoot.getElementById('loglens-spacer');
+    if (spacer) {
+      spacer.style.height = '0px';
+    }
 
     const query = STATE.searchQuery;
     const queryTerms = query ? query.split('|').filter(Boolean) : [];
@@ -1705,7 +1899,7 @@
   }
 
   function showToast(message) {
-    const container = STATE.shadowRoot.getElementById('logify-toast-container');
+    const container = STATE.shadowRoot.getElementById('loglens-toast-container');
     if (!container) return;
 
     const toast = document.createElement('div');
@@ -1761,7 +1955,6 @@
   chrome.storage.onChanged.addListener((changes) => {
     let needsReclassification = false;
     if (changes.filterPresets) {
-      console.log("Logify Presets Storage Changed:", changes.filterPresets.newValue);
       STATE.filterPresets = changes.filterPresets.newValue || [];
       updatePresetDropdown();
     }
@@ -1836,7 +2029,7 @@
         let color = '#3b82f6';
         if (queryTerms && queryTerms.length > 0) {
           const matchedGroupIndex = queryTerms.findIndex(t => {
-            try { return new RegExp(t, 'i').test(match); } catch(e) { return false; }
+            try { return new RegExp(t, 'i').test(match); } catch (e) { return false; }
           });
           color = HIGHLIGHT_COLORS[matchedGroupIndex !== -1 ? matchedGroupIndex % HIGHLIGHT_COLORS.length : 0];
         }
@@ -1855,15 +2048,15 @@
         result.push(seg);
         continue;
       }
-      
+
       const text = seg.text;
       let match;
       let lastIndex = 0;
-      
+
       // Enforce global match flag
       const flags = regex.flags.includes('g') ? regex.flags : regex.flags + 'g';
       const gRegex = new RegExp(regex.source, flags);
-      
+
       let hasMatch = false;
       while ((match = gRegex.exec(text)) !== null) {
         // Avoid infinite loop on empty regex matches
@@ -1872,18 +2065,18 @@
           continue;
         }
         hasMatch = true;
-        
+
         // Push leading slice
         if (match.index > lastIndex) {
           result.push({ text: text.substring(lastIndex, match.index), html: false });
         }
-        
+
         // Push wrapped match
         result.push({ text: wrapFn(match[0]), html: true });
-        
+
         lastIndex = gRegex.lastIndex;
       }
-      
+
       if (!hasMatch) {
         result.push(seg);
       } else if (lastIndex < text.length) {
@@ -1897,13 +2090,13 @@
   function buildHighlightsPanel() {
     const grid = STATE.shadowRoot.getElementById('highlights-grid');
     if (!grid) return;
-    
+
     let html = '';
     for (let i = 0; i < 10; i++) {
       const h = STATE.multiHighlights[i] || { text: '', pinned: false };
       const color = MULTI_HIGHLIGHT_COLORS[i];
       const pinClass = h.pinned ? 'highlight-pin-btn active' : 'highlight-pin-btn';
-      
+
       html += `
         <div class="highlight-row">
           <span class="color-dot" style="background-color: ${color}; color: ${color};"></span>
@@ -1913,7 +2106,7 @@
       `;
     }
     grid.innerHTML = html;
-    
+
     // Add input listeners
     const inputs = grid.querySelectorAll('.highlight-input');
     inputs.forEach(input => {
@@ -1921,14 +2114,14 @@
         const idx = parseInt(e.target.dataset.index, 10);
         const val = e.target.value;
         STATE.multiHighlights[idx].text = val;
-        
+
         if (STATE.multiHighlights[idx].pinned) {
           saveMultiHighlightsToStorage();
         }
         render();
       });
     });
-    
+
     // Add pin listeners
     const pins = grid.querySelectorAll('.highlight-pin-btn');
     pins.forEach(pin => {
@@ -1936,7 +2129,7 @@
         const btn = e.currentTarget;
         const idx = parseInt(btn.dataset.index, 10);
         STATE.multiHighlights[idx].pinned = !STATE.multiHighlights[idx].pinned;
-        
+
         if (STATE.multiHighlights[idx].pinned) {
           btn.classList.add('active');
           btn.title = "Pinned (persisted)";
@@ -1944,7 +2137,7 @@
           btn.classList.remove('active');
           btn.title = "Unpinned (session only)";
         }
-        
+
         saveMultiHighlightsToStorage();
       });
     });

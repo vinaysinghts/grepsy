@@ -1,8 +1,9 @@
-// Logify Settings Script - popup.js
+// LogLens Settings Script - popup.js
 
 document.addEventListener("DOMContentLoaded", async () => {
   const masterToggle = document.getElementById("master-toggle");
   const forceVirtualToggle = document.getElementById("force-virtual-toggle");
+  const thresholdInput = document.getElementById("virtual-threshold-input");
   const activateBtn = document.getElementById("activate-tab-btn");
   const statusBanner = document.getElementById("status-banner");
 
@@ -15,12 +16,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     const data = await chrome.storage.local.get({
       enabled: true,
       forceVirtualScroll: false,
+      virtualScrollThreshold: 20000,
       customErrorTerms: [],
       customWarnTerms: [],
       filterPresets: []
     });
     masterToggle.checked = data.enabled;
     forceVirtualToggle.checked = data.forceVirtualScroll;
+    thresholdInput.value = data.virtualScrollThreshold;
     customErrorTerms = data.customErrorTerms;
     customWarnTerms = data.customWarnTerms;
     filterPresets = data.filterPresets;
@@ -35,6 +38,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   forceVirtualToggle.addEventListener("change", () => {
     chrome.storage.local.set({ forceVirtualScroll: forceVirtualToggle.checked });
+  });
+
+  thresholdInput.addEventListener("change", () => {
+    let val = parseInt(thresholdInput.value, 10);
+    if (isNaN(val) || val < 100) val = 20000;
+    thresholdInput.value = val;
+    chrome.storage.local.set({ virtualScrollThreshold: val });
   });
 
   // 3. Manual Activation
@@ -52,11 +62,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Check for restricted URLs (e.g. chrome://, edge://, extension pages)
       if (tab.url.startsWith("chrome://") || tab.url.startsWith("edge://") || tab.url.startsWith("about:") || tab.url.startsWith("chrome-extension://")) {
-        throw new Error("Logify cannot run on browser internal systems.");
+        throw new Error("LogLens cannot run on browser internal systems.");
       }
 
-      activateBtn.textContent = "Activating Logify...";
-      
+      activateBtn.textContent = "Activating LogLens...";
+
       // Dispatch message to background worker for suitability check and injection
       chrome.runtime.sendMessage(
         { action: "forceActivate", tabId: tab.id },
@@ -64,7 +74,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (chrome.runtime.lastError) {
             showStatus(chrome.runtime.lastError.message, "error");
           } else if (response && response.success) {
-            showStatus("Logify successfully applied to this tab!", "success");
+            showStatus("LogLens successfully applied to this tab!", "success");
             // Close popup after a short delay on success
             setTimeout(() => window.close(), 1500);
           } else {
@@ -109,20 +119,36 @@ document.addEventListener("DOMContentLoaded", async () => {
     customErrorTerms.forEach((term, index) => {
       const chip = document.createElement("div");
       chip.className = "keyword-chip error-chip";
-      chip.innerHTML = `
-        <span>${term}</span>
-        <span class="remove-keyword" data-type="error" data-idx="${index}">&times;</span>
-      `;
+
+      const span = document.createElement("span");
+      span.textContent = term;
+
+      const closeBtn = document.createElement("span");
+      closeBtn.className = "remove-keyword";
+      closeBtn.dataset.type = "error";
+      closeBtn.dataset.idx = index;
+      closeBtn.innerHTML = "&times;"; // HTML entity representing visual 'x' character is safe
+
+      chip.appendChild(span);
+      chip.appendChild(closeBtn);
       errorListEl.appendChild(chip);
     });
 
     customWarnTerms.forEach((term, index) => {
       const chip = document.createElement("div");
       chip.className = "keyword-chip warn-chip";
-      chip.innerHTML = `
-        <span>${term}</span>
-        <span class="remove-keyword" data-type="warn" data-idx="${index}">&times;</span>
-      `;
+
+      const span = document.createElement("span");
+      span.textContent = term;
+
+      const closeBtn = document.createElement("span");
+      closeBtn.className = "remove-keyword";
+      closeBtn.dataset.type = "warn";
+      closeBtn.dataset.idx = index;
+      closeBtn.innerHTML = "&times;"; // HTML entity representing visual 'x' character is safe
+
+      chip.appendChild(span);
+      chip.appendChild(closeBtn);
       warnListEl.appendChild(chip);
     });
   }
@@ -153,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   addErrorBtn.addEventListener("click", () => addTerm("error"));
   addWarnBtn.addEventListener("click", () => addTerm("warn"));
-  
+
   errorInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") addTerm("error");
   });
@@ -172,13 +198,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     filterPresets.forEach((preset, index) => {
       const item = document.createElement("div");
       item.className = "preset-item";
-      item.innerHTML = `
-        <div class="preset-info" data-idx="${index}" style="cursor: pointer; flex: 1; display: flex; flex-direction: column; overflow: hidden;" title="Click to edit preset">
-          <span class="preset-name">${preset.name}</span>
-          <span class="preset-query">${preset.query}</span>
-        </div>
-        <button class="preset-del-btn" data-idx="${index}">✕</button>
-      `;
+
+      const infoDiv = document.createElement("div");
+      infoDiv.className = "preset-info";
+      infoDiv.dataset.idx = index;
+      infoDiv.style.cursor = "pointer";
+      infoDiv.style.flex = "1";
+      infoDiv.style.display = "flex";
+      infoDiv.style.flexDirection = "column";
+      infoDiv.style.overflow = "hidden";
+      infoDiv.title = "Click to edit preset";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "preset-name";
+      nameSpan.textContent = preset.name;
+
+      const querySpan = document.createElement("span");
+      querySpan.className = "preset-query";
+      querySpan.textContent = preset.query;
+
+      infoDiv.appendChild(nameSpan);
+      infoDiv.appendChild(querySpan);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "preset-del-btn";
+      delBtn.dataset.idx = index;
+      delBtn.textContent = "✕";
+
+      item.appendChild(infoDiv);
+      item.appendChild(delBtn);
       presetListEl.appendChild(item);
     });
   }

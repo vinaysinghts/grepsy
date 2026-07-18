@@ -1,4 +1,4 @@
-/* Logify Popup Stylesheet - popup.css */
+/* LogLens Popup Stylesheet - popup.css */
 
 :root {
   --bg-primary: #0a0b0d;
@@ -52,17 +52,27 @@ body {
   gap: 8px;
 }
 
-.logo-icon {
-  font-size: 1.25rem;
-}
-
 .logo-text {
   font-size: 1.2rem;
   font-weight: 700;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 1.5px;
+}
+
+.logo-grad-text {
   background: var(--accent-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.logo-smiley {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  vertical-align: middle;
+  transform: translateY(-0.5px);
 }
 
 .version {
@@ -440,4 +450,23 @@ input:checked + .slider:before {
 .preset-del-btn:hover {
   color: var(--error-color);
   background: rgba(239, 68, 68, 0.12);
+}
+
+.numeric-input {
+  width: 80px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 4px 6px;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  outline: none;
+  text-align: right;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.numeric-input:focus {
+  border-color: var(--accent-color);
+  background: rgba(255, 255, 255, 0.06);
 }
