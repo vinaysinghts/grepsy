@@ -69,13 +69,26 @@
 }
 
 .logo {
-  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.logo-text {
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  user-select: none;
+}
+
+.logo-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .search-wrapper {

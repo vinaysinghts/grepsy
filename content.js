@@ -263,7 +263,21 @@
       <!-- Floating Minimalist Taskbar -->
       <div id="loglens-taskbar">
         <div class="taskbar-left">
-          <span class="logo">LQgLens</span>
+          <span class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <defs>
+                <linearGradient id="logo-icon-grad-shadow" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#3b82f6"></stop>
+                  <stop offset="100%" stop-color="#a855f7"></stop>
+                </linearGradient>
+              </defs>
+              <circle cx="9" cy="9" r="6" stroke="url(#logo-icon-grad-shadow)"></circle>
+              <path d="M14 14l5 5" stroke="url(#logo-icon-grad-shadow)"></path>
+              <path d="M6.5 7.5h5" stroke="url(#logo-icon-grad-shadow)" stroke-width="1.5"></path>
+              <path d="M6.5 10.5h5" stroke="url(#logo-icon-grad-shadow)" stroke-width="1.5"></path>
+            </svg>
+            <span class="logo-text">LogLens</span>
+          </span>
           <span class="total-lines-text" id="loglens-lines-counter">Showing: ${STATE.stats.total.toLocaleString()} / ${STATE.stats.total.toLocaleString()}</span>
           <div class="search-wrapper">
             <input type="text" id="loglens-search" placeholder="Filter lines with regex or use | for multiple terms" />
