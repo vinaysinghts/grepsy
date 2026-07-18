@@ -263,7 +263,7 @@
       <!-- Floating Minimalist Taskbar -->
       <div id="loglens-taskbar">
         <div class="taskbar-left">
-          <span class="logo"><span class="logo-grad-text">L</span><svg class="logo-smiley" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="logo-smiley-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3b82f6"></stop><stop offset="100%" stop-color="#a855f7"></stop></linearGradient></defs><circle cx="10" cy="10" r="7" stroke="url(#logo-smiley-grad)"></circle><path d="M15 15l5.5 5.5" stroke="url(#logo-smiley-grad)"></path><circle cx="8" cy="9" r="0.8" fill="url(#logo-smiley-grad)" stroke="none"></circle><circle cx="12" cy="9" r="0.8" fill="url(#logo-smiley-grad)" stroke="none"></circle><path d="M7.5 12.2 Q 10 14.2 12.5 12.2" stroke="url(#logo-smiley-grad)" stroke-width="1.8"></path></svg><span class="logo-grad-text">gLens</span></span>
+          <span class="logo">LQgLens</span>
           <span class="total-lines-text" id="loglens-lines-counter">Showing: ${STATE.stats.total.toLocaleString()} / ${STATE.stats.total.toLocaleString()}</span>
           <div class="search-wrapper">
             <input type="text" id="loglens-search" placeholder="Filter lines with regex or use | for multiple terms" />
