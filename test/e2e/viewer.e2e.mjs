@@ -90,6 +90,20 @@ try {
 
   await page.keyboard.press('Escape');
 
+  // Theme: auto follows the system; the button cycles light then dark, and the choice survives a reload.
+  const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.locator('.toolbar [data-theme-toggle]').click();
+  if ((await theme()) !== 'light') throw new Error('theme button did not switch to light');
+  await page.reload();
+  if ((await theme()) !== 'light') throw new Error('light theme was not remembered');
+  await page.locator('[data-theme-toggle]:visible').click();
+  await page.locator('[data-theme-toggle]:visible').click();
+  if ((await theme()) !== 'dark') throw new Error('auto theme did not follow the dark system setting');
+
   // A gzipped log with JSON in a line: decompressed on open, JSON shown pretty-printed.
   await page.reload();
   const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO done'];

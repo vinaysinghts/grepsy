@@ -62,4 +62,22 @@ describe('parser worker', () => {
       '09:01 WARN second b',
     ]);
   });
+
+  it('jumps between errors without stopping on their stack frames', async () => {
+    const { posted, send } = await loadWorker();
+    const text = ['09:00 INFO a', '09:01 ERROR first', '    at f (a.js:1)', '    at g (b.js:2)', '09:02 ERROR second'].join('\n');
+    send({ type: 'open', file: slowFile(text) });
+    await until(() => posted.some((m) => m.type === 'loaded'));
+    send({ type: 'view', id: 1, query: { text: '', caseSensitive: false, regex: false, filter: false, context: 0, levels: [0, 1, 2, 3, 4, 5] } });
+    const rowsFound: (number | null)[] = [];
+    let from = -1;
+    for (let i = 0; i < 3; i++) {
+      send({ type: 'find', id: 1, fromRow: from, direction: 1, target: 'error' });
+      const found = posted.filter((m) => m.type === 'found').at(-1);
+      const row = found && found.type === 'found' ? found.row : null;
+      rowsFound.push(row);
+      from = row ?? from;
+    }
+    expect(rowsFound).toEqual([1, 4, 1]);
+  });
 });

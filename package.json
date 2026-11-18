@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
-    "e2e": "node test/e2e/viewer.e2e.mjs"
+    "e2e": "node test/e2e/viewer.e2e.mjs",
+    "package": "vite build && rm -f grepsy-$npm_package_version.zip && cd dist && zip -qr ../grepsy-$npm_package_version.zip .",
+    "store:screenshots": "node scripts/store-assets.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

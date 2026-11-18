@@ -7,7 +7,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     // Browser tests run in Node, but their page callbacks run in the page.
-    files: ['test/e2e/**/*.mjs'],
+    files: ['test/e2e/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: { URL: 'readonly', console: 'readonly', document: 'readonly' },
     },

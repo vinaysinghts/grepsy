@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { detectLevel } from '../core/level';
 import { LineStore } from '../core/lineStore';
 import { compileQuery } from '../core/query';
 import { readLines } from '../core/readLines';
@@ -102,10 +103,16 @@ function getRows(id: number, start: number, count: number): void {
   post({ type: 'rows', id, start, rows: out });
 }
 
+/** An error line that starts an entry, not a stack frame continuing the one above. */
+function isErrorStart(line: number): boolean {
+  if (store.level(line) !== 1) return false;
+  return line === 0 || store.level(line - 1) !== 1 || detectLevel(store.text(line)) !== null;
+}
+
 function find(id: number, fromRow: number, direction: 1 | -1, target: 'match' | 'error' | 'bookmark'): void {
   const hit = (line: number) =>
     target === 'bookmark' ? bookmarks.has(line)
-    : target === 'error' ? store.level(line) === 1
+    : target === 'error' ? isErrorStart(line)
     : matcher !== null && matcher.test(store.text(line));
   const n = rows.length;
   for (let step = 1; step <= n; step++) {
