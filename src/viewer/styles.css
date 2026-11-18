@@ -90,3 +90,44 @@ mark { background: var(--hit); color: inherit; border-radius: 2px; }
 
 .status { display: flex; gap: 16px; align-items: center; height: 22px; padding: 0 10px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; }
 .grow { flex: 1; }
+
+/* Highlight rule colors: distinct in hue and lightness on the dark ground. */
+.hl0 { background: rgba(47, 184, 168, 0.40); }
+.hl1 { background: rgba(167, 139, 250, 0.42); }
+.hl2 { background: rgba(255, 122, 122, 0.40); }
+.hl3 { background: rgba(84, 160, 255, 0.42); }
+.hl4 { background: rgba(255, 159, 67, 0.42); }
+.hl5 { background: rgba(255, 159, 243, 0.40); }
+mark[class^='hl'] { color: inherit; border-radius: 2px; }
+
+.tool-btn { height: 28px; padding: 0 10px; background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+.tool-btn:hover, .tool-btn[aria-pressed='true'], .tool-btn[aria-expanded='true'] { background: var(--raised); color: var(--text-strong); }
+.tool-btn.icon { width: 28px; padding: 0; font-weight: 600; font-size: 13px; }
+
+.menu-wrap { position: relative; }
+.menu { position: absolute; right: 0; top: 34px; z-index: 5; width: 230px; padding: 4px; background: #171a22; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); display: flex; flex-direction: column; }
+.menu a, .menu button { display: block; width: 100%; padding: 7px 10px; border: 0; border-radius: 4px; background: none; color: var(--text); text-align: left; text-decoration: none; font-size: 12px; cursor: pointer; }
+.menu a:hover, .menu button:hover, .menu a:focus-visible, .menu button:focus-visible { background: var(--raised); outline: none; }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.menu-note { margin: 0; padding: 6px 10px 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+
+.body { flex: 1; min-height: 0; display: flex; }
+.body .log { flex: 1; min-width: 0; }
+.rules { width: 230px; flex: none; border-left: 1px solid var(--border); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.rules ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
+.rules li:hover { background: var(--raised); }
+.swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.rule-term { flex: 1; min-width: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-remove { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
+.rule-remove:hover { color: var(--text-strong); background: var(--border); }
+.rule-form input { width: 100%; height: 26px; padding: 0 6px; background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
+.rule-form input:focus { border-style: solid; border-color: var(--accent); }
+.rules-note { margin: 4px 0 0; font-size: 11px; line-height: 1.4; }
+
+dialog { background: #171a22; color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 20px; min-width: 340px; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+dialog h2 { margin: 0 0 12px; font-size: 14px; color: var(--text-strong); }
+dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0 0 14px; }
+dialog dd { margin: 0; color: var(--muted); }
+kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--raised); }

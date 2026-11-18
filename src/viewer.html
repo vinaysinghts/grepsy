@@ -38,18 +38,53 @@
         <button type="button" class="tog mono" id="regex" aria-pressed="false" aria-label="Regular expression" title="Regular expression">.*</button>
       </div>
       <div class="levels" id="levels"></div>
+      <span class="grow"></span>
+      <button type="button" class="tool-btn" id="rules-toggle" aria-pressed="false" aria-controls="rules-panel">Highlights</button>
+      <div class="menu-wrap">
+        <button type="button" class="tool-btn icon" id="help-toggle" aria-expanded="false" aria-controls="help-menu" aria-label="Help and feedback">?</button>
+        <div class="menu" id="help-menu" role="menu" hidden>
+          <button type="button" role="menuitem" id="show-shortcuts">Keyboard shortcuts</button>
+          <a role="menuitem" id="known-issues" target="_blank" rel="noopener">Known issues</a>
+          <hr>
+          <a role="menuitem" id="report-bug" target="_blank" rel="noopener">Report a bug</a>
+          <a role="menuitem" id="suggest-feature" target="_blank" rel="noopener">Suggest a feature</a>
+          <p class="menu-note">Opens GitHub. Your log content is never included.</p>
+        </div>
+      </div>
     </header>
-    <div class="log" id="log" tabindex="0" aria-label="Log lines">
-      <div class="spacer" id="spacer"></div>
-      <div class="rows" id="rows"></div>
+    <div class="body">
+      <div class="log" id="log" tabindex="0" aria-label="Log lines">
+        <div class="spacer" id="spacer"></div>
+        <div class="rows" id="rows"></div>
+      </div>
+      <aside class="rules" id="rules-panel" hidden aria-label="Highlight rules">
+        <ul id="rules-list"></ul>
+        <form id="rule-form" class="rule-form">
+          <label for="rule-input" class="sr-only">Text to highlight</label>
+          <input id="rule-input" placeholder="+ Add highlight" autocomplete="off" spellcheck="false" maxlength="200">
+        </form>
+        <p class="muted rules-note">Highlights are saved and apply to every log you open.</p>
+      </aside>
     </div>
     <footer class="status">
       <span id="status"></span>
       <span class="grow"></span>
       <span id="bookmark-status"></span>
-      <span>Enter / Shift+Enter match · N / Shift+N error · F2 bookmark</span>
+      <span>Enter match · N error · F2 bookmark · ? help</span>
     </footer>
   </div>
+  <dialog id="shortcuts" aria-labelledby="shortcuts-title">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <dl>
+      <dt><kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>Search</dd>
+      <dt><kbd>Enter</kbd> / <kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>Next / previous match</dd>
+      <dt><kbd>N</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd></dt><dd>Next / previous error</dd>
+      <dt><kbd>F2</kbd> / <kbd>Shift</kbd>+<kbd>F2</kbd></dt><dd>Next / previous bookmark</dd>
+      <dt>Click a line number</dt><dd>Bookmark the line</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Leave the search box or close menus</dd>
+    </dl>
+    <form method="dialog"><button class="tool-btn">Close</button></form>
+  </dialog>
   <script type="module" src="./viewer/main.ts"></script>
 </body>
 </html>

@@ -1,0 +1,28 @@
+name: Issue triage
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      # Only issues a maintainer marked "needs-info" can go stale: if the reporter
+      # doesn't reply within 14 days, the issue is closed. It can be reopened anytime.
+      - uses: actions/stale@v9
+        with:
+          only-labels: needs-info
+          days-before-stale: 14
+          days-before-close: 7
+          stale-issue-label: stale
+          stale-issue-message: >
+            This issue has been waiting for more information for 14 days. It will close in 7 days
+            unless there's a reply. You can always reopen it with the details.
+          close-issue-message: Closed for lack of information. Reply or reopen with details anytime.
+          days-before-pr-stale: -1
+          days-before-pr-close: -1

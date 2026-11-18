@@ -30,25 +30,3 @@ export function compileQuery(o: QueryOptions): CompiledQuery {
     return { kind: 'error', message: (e as Error).message };
   }
 }
-
-export interface Span {
-  text: string;
-  hit: boolean;
-}
-
-/** Splits a line into plain and matching parts, for safe rendering with textContent. */
-export function splitMatches(line: string, highlight: RegExp | null): Span[] {
-  if (!highlight) return [{ text: line, hit: false }];
-  const spans: Span[] = [];
-  let last = 0;
-  highlight.lastIndex = 0;
-  for (const m of line.matchAll(highlight)) {
-    const start = m.index;
-    if (m[0].length === 0) continue;
-    if (start > last) spans.push({ text: line.slice(last, start), hit: false });
-    spans.push({ text: m[0], hit: true });
-    last = start + m[0].length;
-  }
-  if (last < line.length || spans.length === 0) spans.push({ text: line.slice(last), hit: false });
-  return spans;
-}

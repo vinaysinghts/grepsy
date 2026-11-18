@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compileQuery, splitMatches } from '../src/core/query';
+import { compileQuery } from '../src/core/query';
 
 const opts = { caseSensitive: false, regex: false };
 
@@ -29,31 +29,5 @@ describe('compileQuery', () => {
 
   it('rejects patterns that match empty text', () => {
     expect(compileQuery({ ...opts, regex: true, text: 'a*' }).kind).toBe('error');
-  });
-});
-
-describe('splitMatches', () => {
-  it('splits a line into plain and matching parts', () => {
-    const q = compileQuery({ ...opts, text: 'timeout' });
-    if (q.kind !== 'ok') throw new Error('expected ok');
-    expect(splitMatches('a Timeout b timeout', q.highlight)).toEqual([
-      { text: 'a ', hit: false },
-      { text: 'Timeout', hit: true },
-      { text: ' b ', hit: false },
-      { text: 'timeout', hit: true },
-    ]);
-  });
-
-  it('returns the whole line when there is no query or match', () => {
-    expect(splitMatches('abc', null)).toEqual([{ text: 'abc', hit: false }]);
-    const q = compileQuery({ ...opts, text: 'zzz' });
-    if (q.kind !== 'ok') throw new Error('expected ok');
-    expect(splitMatches('abc', q.highlight)).toEqual([{ text: 'abc', hit: false }]);
-  });
-
-  it('is safe to call repeatedly with the same global regex', () => {
-    const q = compileQuery({ ...opts, text: 'a' });
-    if (q.kind !== 'ok') throw new Error('expected ok');
-    expect(splitMatches('a', q.highlight)).toEqual(splitMatches('a', q.highlight));
   });
 });

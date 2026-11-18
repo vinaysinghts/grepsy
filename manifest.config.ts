@@ -5,9 +5,10 @@ import pkg from './package.json' with { type: 'json' };
  * and version have one source of truth: package.json. Renaming the product
  * means changing `displayName` there.
  *
- * No permissions are requested: the viewer is an extension page that reads
- * files the user picks, so it needs no host or tab access. Fewer permissions
- * also means a faster, simpler store review.
+ * The only permission is `storage`, for saved highlight rules; it shows no
+ * install warning. The viewer is an extension page that reads files the user
+ * picks, so it needs no host or tab access. Fewer permissions also means a
+ * faster, simpler store review.
  */
 export function buildManifest(): chrome.runtime.ManifestV3 {
   return {
@@ -30,6 +31,7 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
       48: 'icons/icon48.png',
       128: 'icons/icon128.png',
     },
+    permissions: ['storage'],
     background: { service_worker: 'background.js', type: 'module' },
     commands: {
       _execute_action: {

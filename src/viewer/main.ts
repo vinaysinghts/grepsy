@@ -1,7 +1,10 @@
+import { splitTagged, type Pattern } from '../core/highlights';
 import { LEVEL_COUNT } from '../core/lineStore';
-import { compileQuery, splitMatches } from '../core/query';
+import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
+import { openShortcuts, setupHelpMenu } from './help';
+import { RuleStore } from './rules';
 
 const ROW_HEIGHT = 20;
 const MAX_RENDERED_CHARS = 5000;
@@ -183,17 +186,23 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   text.className = 'text';
   const shown = row.text.length > MAX_RENDERED_CHARS ? row.text.slice(0, MAX_RENDERED_CHARS) + ' …' : row.text;
   // Log text is untrusted: it only ever goes in as text nodes, never as HTML.
-  for (const span of splitMatches(shown, state.highlight)) {
-    if (span.hit) {
+  for (const span of splitTagged(shown, patterns())) {
+    if (span.tag === null) {
+      text.append(span.text);
+    } else {
       const mark = document.createElement('mark');
+      if (span.tag >= 0) mark.className = `hl${span.tag}`;
       mark.textContent = span.text;
       text.append(mark);
-    } else {
-      text.append(span.text);
     }
   }
   div.append(gutter, text);
   return div;
+}
+
+function patterns(): Pattern[] {
+  const list = state.highlight ? [{ re: state.highlight, tag: -1 }] : [];
+  return list.concat(ruleStore.patterns());
 }
 
 function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
@@ -327,5 +336,64 @@ document.addEventListener('keydown', (e) => {
     search.focus();
   } else if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     findNext('error', e.shiftKey ? -1 : 1);
+  }
+});
+
+// ---- Highlight rules ------------------------------------------------------
+
+const ruleStore = new RuleStore();
+const rulesPanel = $('rules-panel');
+const rulesToggle = $<HTMLButtonElement>('rules-toggle');
+const rulesList = $('rules-list');
+const ruleForm = $<HTMLFormElement>('rule-form');
+const ruleInput = $<HTMLInputElement>('rule-input');
+
+function drawRules(): void {
+  rulesList.replaceChildren(
+    ...ruleStore.rules.map((r, i) => {
+      const li = document.createElement('li');
+      const sw = document.createElement('span');
+      sw.className = `swatch hl${r.color}`;
+      const term = document.createElement('span');
+      term.className = 'rule-term';
+      term.textContent = r.term;
+      term.title = r.term;
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'rule-remove';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', `Remove highlight ${r.term}`);
+      rm.addEventListener('click', () => ruleStore.remove(i));
+      li.append(sw, term, rm);
+      return li;
+    }),
+  );
+  rulesToggle.textContent = ruleStore.rules.length ? `Highlights ${ruleStore.rules.length}` : 'Highlights';
+  render();
+}
+
+ruleStore.onChange(drawRules);
+void ruleStore.load();
+
+rulesToggle.addEventListener('click', () => {
+  const open = rulesPanel.hidden;
+  rulesPanel.hidden = !open;
+  rulesToggle.setAttribute('aria-pressed', String(open));
+  if (open) ruleInput.focus();
+  render();
+});
+ruleForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (ruleStore.add(ruleInput.value)) ruleInput.value = '';
+});
+
+// ---- Help -----------------------------------------------------------------
+
+setupHelpMenu();
+document.addEventListener('keydown', (e) => {
+  if (viewer.hidden || e.target instanceof HTMLInputElement) return;
+  if (e.key === '?') {
+    e.preventDefault();
+    openShortcuts();
   }
 });
