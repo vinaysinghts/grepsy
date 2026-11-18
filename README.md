@@ -1,6 +1,6 @@
 # Grepsy: a fast, private log viewer for Chromium browsers
 
-Open huge log files in your browser, then filter, highlight and jump between errors. Files never leave your computer, and the extension asks for no access to your sites or tabs.
+Open huge log files in your browser, then filter, highlight and jump between errors. Files never leave your computer, and the extension asks for no access to your sites or tabs unless you turn on a feature that needs it.
 
 > **Status:** early rebuild. The previous extension, LogLens, lives in [`legacy/`](legacy/) for reference while features are ported.
 
@@ -15,7 +15,8 @@ npm run e2e      # load dist/ in Chromium and click through the viewer
 
 ## Using it
 
-- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file, or paste text. Gzipped logs (`.gz`) are decompressed automatically.
+- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file, paste text, or open a URL. Gzipped logs (`.gz`) are decompressed automatically.
+- **Open .log files automatically (optional):** turn it on from the start screen. The extension then asks for file access, and `.log` files you open in the browser go straight to Grepsy.
 - **Search:** type in the search box. `Aa` matches case and `.*` switches to a regular expression.
 - **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.
 - **Levels:** click Errors, Warnings, Info or Debug to hide or show them. Stack trace lines follow the level of the line they belong to.
