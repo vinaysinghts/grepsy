@@ -7,6 +7,10 @@ import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
 import { fetchAsFile, setupAutoOpen } from './sources';
+import { setupTheme } from './theme';
+
+// First, so the page paints in the right theme.
+setupTheme();
 
 const ROW_HEIGHT = 20;
 const MAX_RENDERED_CHARS = 5000;

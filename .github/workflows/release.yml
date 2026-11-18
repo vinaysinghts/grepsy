@@ -1,0 +1,53 @@
+name: Release
+
+# Push a tag like v0.2.0 (matching package.json's version) to build, test,
+# package and publish a GitHub Release. If the Chrome Web Store secrets are
+# set, the zip is also uploaded to the store as a draft; you then submit it
+# for review from the developer dashboard.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CWS_CONFIGURED: ${{ secrets.CWS_EXTENSION_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the tag matches package.json
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - run: npm run package
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "grepsy-${GITHUB_REF_NAME#v}.zip" --title "Grepsy $GITHUB_REF_NAME" --generate-notes
+
+      - name: Upload to Chrome Web Store (draft)
+        if: env.CWS_CONFIGURED == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: npx --yes chrome-webstore-upload-cli@4.0.2 upload --source "grepsy-${GITHUB_REF_NAME#v}.zip"
