@@ -1,4 +1,4 @@
-# [NAME]: a fast, private log viewer for Chromium browsers
+# Grepsy: a fast, private log viewer for Chromium browsers
 
 Open huge log files in your browser, then filter, highlight and jump between errors. Files never leave your computer, and the extension asks for no permissions.
 

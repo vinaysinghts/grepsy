@@ -1,6 +1,6 @@
 {
-  "name": "log-viewer-extension",
-  "displayName": "[NAME]",
+  "name": "grepsy",
+  "displayName": "Grepsy",
   "description": "Open, filter and highlight large log files right in your browser. Nothing leaves your computer.",
   "version": "0.1.0",
   "private": true,
