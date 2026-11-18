@@ -21,22 +21,31 @@ function post(msg: Response): void {
   self.postMessage(msg);
 }
 
+let loadGeneration = 0;
+
 async function open(file: File): Promise<void> {
+  // A newer open (another file picked or dropped mid-load) supersedes this
+  // one: each load fills its own store and only the latest one is published.
+  const generation = ++loadGeneration;
   const started = performance.now();
-  store = new LineStore();
-  bookmarks.clear();
+  const next = new LineStore();
   let bytes = 0;
   let lastReport = 0;
   for await (const batch of readLines(file)) {
-    store.append(batch);
+    if (generation !== loadGeneration) return;
+    next.append(batch);
     for (const l of batch) bytes += l.length + 1;
     const now = performance.now();
     if (now - lastReport > 100) {
       lastReport = now;
-      post({ type: 'progress', lines: store.length, bytes, totalBytes: file.size });
+      post({ type: 'progress', lines: next.length, bytes, totalBytes: file.size });
     }
   }
+  if (generation !== loadGeneration) return;
+  store = next;
+  bookmarks.clear();
   expanded = new Uint8Array(store.length);
+  rows = new Int32Array(0);
   post({ type: 'loaded', lines: store.length, counts: [...store.counts], ms: Math.round(performance.now() - started) });
 }
 
