@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in Grepsy doesn't work as expected.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Grepsy. Please [search open issues](https://github.com/vinaysinghts/loglens/issues?q=is%3Aissue) first. If yours is already there, add a 👍 to it instead.
+
+        **Never paste private log content.** If a specific line triggers the bug, replace sensitive values with placeholders.
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you file
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a .log file of about 200 MB
+        2. Turn on Filter and search for "timeout"
+        3. Scroll to the end
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Screenshots help. Crop out anything private.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Grepsy version
+      description: Filled in automatically when you use "Report a bug" in the app.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Google Chrome 131, Edge 131, Brave 1.73…
+    validations:
+      required: true
+  - type: input
+    id: file-size
+    attributes:
+      label: Roughly how big was the log?
+      placeholder: 50 MB / 300,000 lines

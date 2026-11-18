@@ -8,7 +8,7 @@ LogLens injected a content script into `file://` pages and replaced the page bod
 
 ## Decision
 
-The viewer is `viewer.html` inside the extension, opened in its own tab by the toolbar icon or `Ctrl+Shift+L`. Files arrive through the File API (picker, drag and drop, paste). The manifest requests **no permissions**.
+The viewer is `viewer.html` inside the extension, opened in its own tab by the toolbar icon or `Ctrl+Shift+L`. Files arrive through the File API (picker, drag and drop, paste). The manifest requests **no permissions** beyond `storage` (added for saved highlight rules; it triggers no install warning).
 
 Opening `file://` logs automatically is planned as an *optional* feature that asks for access only when the user turns it on.
 

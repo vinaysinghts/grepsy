@@ -60,6 +60,31 @@ try {
   assert.equal(await page.locator('.row', { hasText: 'WARN' }).count(), 0);
   assert.equal(await page.locator('.row', { hasText: 'DEBUG' }).count(), 1);
 
+  // Highlight rules: add one, see it color the text, and find it again after a reload.
+  await page.click('#rules-toggle');
+  await page.fill('#rule-input', 'user_id=42');
+  await page.press('#rule-input', 'Enter');
+  await page.waitForSelector('mark.hl0', { state: 'attached' });
+  assert.equal(await page.textContent('#rules-toggle'), 'Highlights 1');
+  await page.reload();
+  await page.setInputFiles('#file', sample);
+  await page.waitForSelector('mark.hl0', { state: 'attached' });
+  await page.click('#rules-toggle');
+  await page.click('.rule-remove');
+  await page.waitForFunction(() => !document.querySelector('mark.hl0'));
+
+  // Help menu: bug links carry the version and browser, never log content.
+  await page.click('#help-toggle');
+  const bugUrl = new URL(await page.getAttribute('#report-bug', 'href'));
+  assert.equal(bugUrl.searchParams.get('template'), 'bug_report.yml');
+  assert.equal(bugUrl.searchParams.get('version'), '0.1.0');
+  assert.ok(bugUrl.searchParams.get('browser'));
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isHidden('#help-menu'), true);
+  await page.locator('#log').focus();
+  await page.keyboard.press('?');
+  await page.waitForSelector('#shortcuts[open]');
+
   assert.deepEqual(errors, []);
   console.log('e2e: all checks passed');
 } finally {

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Suggest a feature
+    url: https://github.com/vinaysinghts/loglens/discussions/categories/ideas
+    about: Share ideas and upvote others' in Discussions. The most-wanted ideas become issues.
+  - name: Ask a question
+    url: https://github.com/vinaysinghts/loglens/discussions/categories/q-a
+    about: Questions about using Grepsy.
