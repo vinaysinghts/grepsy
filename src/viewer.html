@@ -18,6 +18,7 @@
     </label>
     <div class="start-actions">
       <button type="button" class="tool-btn" id="paste-btn">Paste text</button>
+      <button type="button" class="tool-btn" id="url-btn">Open a URL</button>
       <span class="muted">or press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere on this page</span>
     </div>
     <div class="paste-box" id="paste-box" hidden>
@@ -25,7 +26,23 @@
       <textarea id="paste-input" placeholder="Paste log lines here" spellcheck="false"></textarea>
       <button type="button" class="tool-btn primary" id="paste-open">Open</button>
     </div>
+    <form class="url-box" id="url-box" hidden>
+      <label for="url-input" class="sr-only">Log URL</label>
+      <input id="url-input" type="url" placeholder="https://example.com/logs/app.log" required>
+      <button class="tool-btn primary">Open</button>
+    </form>
     <p class="progress muted" id="progress" aria-live="polite"></p>
+    <section class="card" id="auto-open" aria-labelledby="auto-open-title">
+      <div>
+        <h2 id="auto-open-title">Open .log files automatically</h2>
+        <p class="muted" id="auto-open-status">Any .log file you open in this browser comes straight here.</p>
+      </div>
+      <button type="button" class="tool-btn" id="auto-open-btn">Turn on</button>
+      <div class="auto-open-step" id="file-access-step" hidden>
+        <p>One more step: on the extension's details page, turn on <strong>Allow access to file URLs</strong>.</p>
+        <button type="button" class="tool-btn" id="file-access-btn">Open extension settings</button>
+      </div>
+    </section>
   </main>
 
   <div class="viewer" id="viewer" hidden>

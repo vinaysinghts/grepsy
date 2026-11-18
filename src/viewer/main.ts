@@ -6,6 +6,7 @@ import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
+import { fetchAsFile, setupAutoOpen } from './sources';
 
 const ROW_HEIGHT = 20;
 const MAX_RENDERED_CHARS = 5000;
@@ -93,7 +94,35 @@ document.addEventListener('drop', (e) => {
   const f = e.dataTransfer?.files[0];
   if (f) open(f);
 });
-$('home').addEventListener('click', () => location.reload());
+$('home').addEventListener('click', () => {
+  location.href = 'viewer.html';
+});
+
+// Opening by URL: the "Open a URL" box, or ?src= when the background
+// script redirected a file:// log tab here.
+const urlBox = $<HTMLFormElement>('url-box');
+const urlInput = $<HTMLInputElement>('url-input');
+async function openUrl(url: string, askForAccess: boolean): Promise<void> {
+  progress.classList.remove('error');
+  progress.textContent = `Downloading ${url}…`;
+  try {
+    open(await fetchAsFile(url, askForAccess));
+  } catch (err) {
+    progress.classList.add('error');
+    progress.textContent = (err as Error).message;
+  }
+}
+$('url-btn').addEventListener('click', () => {
+  urlBox.hidden = false;
+  urlInput.focus();
+});
+urlBox.addEventListener('submit', (e) => {
+  e.preventDefault();
+  void openUrl(urlInput.value.trim(), true);
+});
+const src = new URLSearchParams(location.search).get('src');
+if (src) void openUrl(src, false);
+void setupAutoOpen();
 
 // ---- Talking to the worker -----------------------------------------------
 

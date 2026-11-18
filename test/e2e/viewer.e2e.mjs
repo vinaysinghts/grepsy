@@ -4,6 +4,8 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const dist = fileURLToPath(new URL('../../dist', import.meta.url));
@@ -107,6 +109,22 @@ try {
   await page.click('#paste-open');
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('2 rows'));
   assert.equal(await page.textContent('#file-name'), 'pasted.log');
+
+  // ?src= loads a log by URL (used when a file:// log tab is redirected here).
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/plain', 'access-control-allow-origin': '*' });
+    res.end(readFileSync(sample));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const logUrl = `http://127.0.0.1:${server.address().port}/logs/remote.log`;
+  await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(logUrl)}`);
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
+  assert.equal(await page.textContent('#file-name'), 'remote.log');
+  server.close();
+
+  // The auto-open card starts switched off.
+  await page.goto(`chrome-extension://${id}/viewer.html`);
+  await page.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
 
   assert.deepEqual(errors, []);
   console.log('e2e: all checks passed');

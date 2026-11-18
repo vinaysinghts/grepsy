@@ -5,8 +5,9 @@ import pkg from './package.json' with { type: 'json' };
  * and version have one source of truth: package.json. Renaming the product
  * means changing `displayName` there.
  *
- * The only permission is `storage`, for saved highlight rules; it shows no
- * install warning. The viewer is an extension page that reads files the user
+ * The only permission granted at install is `storage`, for saved highlight
+ * rules; it shows no install warning. Host access is optional and requested
+ * at the moment a user turns on a feature that needs it. The viewer is an extension page that reads files the user
  * picks, so it needs no host or tab access. Fewer permissions also means a
  * faster, simpler store review.
  */
@@ -32,6 +33,9 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
       128: 'icons/icon128.png',
     },
     permissions: ['storage'],
+    // Asked for only when the user turns a feature on: file:// for opening
+    // local logs automatically, and a site's origin when opening a log by URL.
+    optional_host_permissions: ['file:///*', 'https://*/*', 'http://*/*'],
     background: { service_worker: 'background.js', type: 'module' },
     commands: {
       _execute_action: {
