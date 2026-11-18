@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Log viewer</title>
+  <link rel="stylesheet" href="./viewer/styles.css">
+</head>
+<body>
+  <main class="start">
+    <h1>Open a log</h1>
+    <p class="muted">Files stay on your computer and are never uploaded.</p>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".log,.txt,.json,.jsonl,text/plain">
+      <span class="drop-title">Drop a log file here</span>
+      <span class="muted">or click to choose one</span>
+    </label>
+    <output id="summary" class="summary" aria-live="polite"></output>
+  </main>
+  <script type="module" src="./viewer/main.ts"></script>
+</body>
+</html>
