@@ -12,10 +12,19 @@
     <h1>Open a log</h1>
     <p class="muted">Filter, highlight and jump between errors in files with millions of lines. Files stay on your computer and are never uploaded.</p>
     <label class="drop" id="drop">
-      <input type="file" id="file" accept=".log,.txt,.json,.jsonl,.out,.err,text/plain">
+      <input type="file" id="file" accept=".log,.txt,.json,.jsonl,.out,.err,.gz,text/plain,application/gzip">
       <span class="drop-title">Drop a log file here</span>
-      <span class="muted">or click to choose one</span>
+      <span class="muted">or click to choose one · .log, .txt, .jsonl and .gz</span>
     </label>
+    <div class="start-actions">
+      <button type="button" class="tool-btn" id="paste-btn">Paste text</button>
+      <span class="muted">or press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere on this page</span>
+    </div>
+    <div class="paste-box" id="paste-box" hidden>
+      <label for="paste-input" class="sr-only">Log text</label>
+      <textarea id="paste-input" placeholder="Paste log lines here" spellcheck="false"></textarea>
+      <button type="button" class="tool-btn primary" id="paste-open">Open</button>
+    </div>
     <p class="progress muted" id="progress" aria-live="polite"></p>
   </main>
 
@@ -84,6 +93,14 @@
       <dt><kbd>Esc</kbd></dt><dd>Leave the search box or close menus</dd>
     </dl>
     <form method="dialog"><button class="tool-btn">Close</button></form>
+  </dialog>
+  <dialog id="json-dialog" class="json-dialog" aria-labelledby="json-title">
+    <h2 id="json-title">JSON on line <span id="json-line"></span></h2>
+    <pre id="json-body"></pre>
+    <form method="dialog" class="dialog-actions">
+      <button type="button" class="tool-btn" id="json-copy">Copy</button>
+      <button class="tool-btn">Close</button>
+    </form>
   </dialog>
   <script type="module" src="./viewer/main.ts"></script>
 </body>
