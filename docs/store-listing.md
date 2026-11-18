@@ -4,9 +4,9 @@ Text for the Chrome Web Store and Microsoft Edge Add-ons listings. Images are in
 
 ## Name
 
-Grepsy: log viewer
+Grepsy: Log Viewer (read from the manifest `name`, set by `storeName` in package.json; the dashboard does not let you edit it)
 
-## Short description (132 characters max)
+## Short description (132 characters max, read from the manifest `description`)
 
 Open huge log files in your browser. Filter, highlight and jump between errors instantly. Nothing is uploaded.
 

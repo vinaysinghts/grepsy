@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 
 const dist = fileURLToPath(new URL('../../dist', import.meta.url));
+const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
 const sample = fileURLToPath(new URL('../fixtures/sample.log', import.meta.url));
 
 const ctx = await chromium.launchPersistentContext('', {
@@ -80,7 +81,7 @@ try {
   await page.click('#help-toggle');
   const bugUrl = new URL(await page.getAttribute('#report-bug', 'href'));
   assert.equal(bugUrl.searchParams.get('template'), 'bug_report.yml');
-  assert.equal(bugUrl.searchParams.get('version'), '0.1.0');
+  assert.equal(bugUrl.searchParams.get('version'), version);
   assert.ok(bugUrl.searchParams.get('browser'));
   await page.keyboard.press('Escape');
   assert.equal(await page.isHidden('#help-menu'), true);
