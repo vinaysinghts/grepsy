@@ -7,16 +7,49 @@
   <link rel="stylesheet" href="./viewer/styles.css">
 </head>
 <body>
-  <main class="start">
+  <main class="start" id="start">
+    <div class="brand"><span class="logo" aria-hidden="true"></span>Grepsy</div>
     <h1>Open a log</h1>
-    <p class="muted">Files stay on your computer and are never uploaded.</p>
+    <p class="muted">Filter, highlight and jump between errors in files with millions of lines. Files stay on your computer and are never uploaded.</p>
     <label class="drop" id="drop">
-      <input type="file" id="file" accept=".log,.txt,.json,.jsonl,text/plain">
+      <input type="file" id="file" accept=".log,.txt,.json,.jsonl,.out,.err,text/plain">
       <span class="drop-title">Drop a log file here</span>
       <span class="muted">or click to choose one</span>
     </label>
-    <output id="summary" class="summary" aria-live="polite"></output>
+    <p class="progress muted" id="progress" aria-live="polite"></p>
   </main>
+
+  <div class="viewer" id="viewer" hidden>
+    <header class="toolbar">
+      <button type="button" class="brand-btn" id="home" aria-label="Open another file"><span class="logo" aria-hidden="true"></span>Grepsy</button>
+      <span class="file-name" id="file-name"></span>
+      <div class="search">
+        <label for="q" class="sr-only">Search the log</label>
+        <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+        <span class="match-count" id="match-count" aria-live="polite"></span>
+        <button type="button" class="tog" id="filter" aria-pressed="false" title="Hide lines that don't match">Filter</button>
+        <span class="ctx" id="ctx" hidden title="Lines of context around each match">
+          <span class="muted">context</span>
+          <button type="button" class="tog" data-ctx="0" aria-pressed="true">0</button>
+          <button type="button" class="tog" data-ctx="2" aria-pressed="false">±2</button>
+          <button type="button" class="tog" data-ctx="5" aria-pressed="false">±5</button>
+        </span>
+        <button type="button" class="tog mono" id="case" aria-pressed="false" aria-label="Match case" title="Match case">Aa</button>
+        <button type="button" class="tog mono" id="regex" aria-pressed="false" aria-label="Regular expression" title="Regular expression">.*</button>
+      </div>
+      <div class="levels" id="levels"></div>
+    </header>
+    <div class="log" id="log" tabindex="0" aria-label="Log lines">
+      <div class="spacer" id="spacer"></div>
+      <div class="rows" id="rows"></div>
+    </div>
+    <footer class="status">
+      <span id="status"></span>
+      <span class="grow"></span>
+      <span id="bookmark-status"></span>
+      <span>Enter / Shift+Enter match · N / Shift+N error · F2 bookmark</span>
+    </footer>
+  </div>
   <script type="module" src="./viewer/main.ts"></script>
 </body>
 </html>
