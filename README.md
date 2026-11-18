@@ -10,7 +10,17 @@ Open huge log files in your browser, then filter, highlight and jump between err
 npm install
 npm run dev      # rebuild into dist/ on every change
 npm run check    # lint, typecheck, tests and production build
+npm run e2e      # load dist/ in Chromium and click through the viewer
 ```
+
+## Using it
+
+- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file.
+- **Search:** type in the search box. `Aa` matches case and `.*` switches to a regular expression.
+- **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.
+- **Levels:** click Errors, Warnings, Info or Debug to hide or show them. Stack trace lines follow the level of the line they belong to.
+- **Bookmarks:** click a line number. Use `F2` / `Shift+F2` to jump between bookmarks.
+- **Jump:** `Enter` / `Shift+Enter` for the next or previous match, `N` / `Shift+N` for the next or previous error, `/` or `Ctrl+F` to search.
 
 To load it in your browser, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the `dist/` folder. The same steps work in Edge, Brave, Vivaldi and Opera.
 
@@ -18,11 +28,12 @@ To load it in your browser, open `chrome://extensions`, turn on **Developer mode
 
 | Path | What lives there |
 | --- | --- |
-| `src/core/` | Pure TypeScript: streaming line reader, level detection. No DOM or `chrome.*`, so it is unit tested and can run in a worker. |
+| `src/core/` | Pure TypeScript: streaming line reader, level detection, line store, search, view model, virtual scrolling maths. No DOM or `chrome.*`, so it is unit tested. |
+| `src/worker/` | The parsing worker and its message protocol. Holds the file's lines off the main thread. |
 | `src/viewer/` | The viewer page UI. |
 | `src/background/` | Service worker: opens the viewer from the toolbar icon or `Ctrl+Shift+L`. |
 | `manifest.config.ts` | Generates `manifest.json` from `package.json` (name, version, description). |
-| `test/` | Vitest unit tests. |
+| `test/` | Vitest unit tests, plus `test/e2e/` for the browser test. |
 | `docs/adr/` | Architecture decision records. |
 
 ## Renaming

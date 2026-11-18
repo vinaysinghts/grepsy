@@ -13,13 +13,15 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "e2e": "node test/e2e/viewer.e2e.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
     "@types/chrome": "^0.3.7",
     "@types/node": "^22.20.5",
     "eslint": "^9.39.0",
+    "playwright": "^1.63.0",
     "typescript": "^5.9.0",
     "typescript-eslint": "^8.46.0",
     "vite": "^7.1.0",
