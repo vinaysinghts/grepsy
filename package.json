@@ -1,7 +1,8 @@
 {
   "name": "grepsy",
   "displayName": "Grepsy",
-  "description": "Open, filter and highlight large log files right in your browser. Nothing leaves your computer.",
+  "storeName": "Grepsy: Log Viewer",
+  "description": "Open huge log files in your browser. Filter, highlight and jump between errors instantly. Nothing is uploaded.",
   "version": "0.1.0",
   "private": true,
   "type": "module",

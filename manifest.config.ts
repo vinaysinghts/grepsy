@@ -3,7 +3,10 @@ import pkg from './package.json' with { type: 'json' };
 /**
  * The extension manifest, generated at build time so the name, description
  * and version have one source of truth: package.json. Renaming the product
- * means changing `displayName` there.
+ * means changing `displayName` there. `storeName` is the full title shown in
+ * the Chrome Web Store and on chrome://extensions (the store reads it from the
+ * manifest and does not let you edit it); `short_name` keeps the bare name
+ * where space is tight.
  *
  * The only permission granted at install is `storage`, for saved highlight
  * rules; it shows no install warning. Host access is optional and requested
@@ -14,7 +17,8 @@ import pkg from './package.json' with { type: 'json' };
 export function buildManifest(): chrome.runtime.ManifestV3 {
   return {
     manifest_version: 3,
-    name: pkg.displayName,
+    name: pkg.storeName,
+    short_name: pkg.displayName,
     description: pkg.description,
     version: pkg.version,
     action: {
