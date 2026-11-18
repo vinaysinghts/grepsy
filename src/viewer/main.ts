@@ -1,4 +1,5 @@
 import { splitTagged, type Pattern } from '../core/highlights';
+import { extractJson, mayContainJson } from '../core/json';
 import { LEVEL_COUNT } from '../core/lineStore';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
@@ -56,6 +57,26 @@ function open(file: File): void {
   document.title = `${file.name} · Grepsy`;
   send({ type: 'open', file });
 }
+
+// Pasting: a button that reveals a text box, or Ctrl+V anywhere on the start screen.
+const pasteBox = $('paste-box');
+const pasteInput = $<HTMLTextAreaElement>('paste-input');
+const openPasted = (text: string) => {
+  if (text.trim()) open(new File([text], 'pasted.log', { type: 'text/plain' }));
+};
+$('paste-btn').addEventListener('click', () => {
+  pasteBox.hidden = false;
+  pasteInput.focus();
+});
+$('paste-open').addEventListener('click', () => openPasted(pasteInput.value));
+document.addEventListener('paste', (e) => {
+  if (startScreen.hidden || e.target === pasteInput) return;
+  const text = e.clipboardData?.getData('text/plain');
+  if (text) {
+    e.preventDefault();
+    openPasted(text);
+  }
+});
 
 fileInput.addEventListener('change', () => {
   const f = fileInput.files?.[0];
@@ -197,6 +218,19 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
     }
   }
   div.append(gutter, text);
+  if (mayContainJson(row.text)) {
+    const found = extractJson(row.text);
+    if (found) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'json-btn';
+      btn.textContent = '{ }';
+      btn.title = 'View JSON';
+      btn.setAttribute('aria-label', `View JSON on line ${row.line + 1}`);
+      btn.addEventListener('click', () => showJson(row.line + 1, found.value));
+      div.append(btn);
+    }
+  }
   return div;
 }
 
@@ -396,4 +430,17 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     openShortcuts();
   }
+});
+
+// ---- JSON viewer ----------------------------------------------------------
+
+const jsonDialog = $<HTMLDialogElement>('json-dialog');
+const jsonBody = $('json-body');
+function showJson(lineNumber: number, value: unknown): void {
+  $('json-line').textContent = lineNumber.toLocaleString();
+  jsonBody.textContent = JSON.stringify(value, null, 2);
+  jsonDialog.showModal();
+}
+$('json-copy').addEventListener('click', () => {
+  void navigator.clipboard.writeText(jsonBody.textContent ?? '');
 });

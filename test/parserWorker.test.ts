@@ -29,7 +29,8 @@ function slowFile(text: string): File {
         else c.enqueue(enc.encode(next));
       },
     });
-  return { size: text.length, stream } as unknown as File;
+  const slice = (a?: number, b?: number) => new Blob([text.slice(a, b)]);
+  return { size: text.length, stream, slice } as unknown as File;
 }
 
 const until = async (cond: () => boolean) => {

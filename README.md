@@ -15,11 +15,12 @@ npm run e2e      # load dist/ in Chromium and click through the viewer
 
 ## Using it
 
-- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file.
+- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file, or paste text. Gzipped logs (`.gz`) are decompressed automatically.
 - **Search:** type in the search box. `Aa` matches case and `.*` switches to a regular expression.
 - **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.
 - **Levels:** click Errors, Warnings, Info or Debug to hide or show them. Stack trace lines follow the level of the line they belong to.
 - **Bookmarks:** click a line number. Use `F2` / `Shift+F2` to jump between bookmarks.
+- **JSON:** lines that contain JSON get a `{ }` button that shows it pretty-printed.
 - **Highlights:** open **Highlights** and add terms to color them in every log. They are saved across sessions.
 - **Help and feedback:** the **?** menu has keyboard shortcuts, known issues, and links to report a bug or suggest a feature. See [docs/issue-workflow.md](docs/issue-workflow.md).
 - **Jump:** `Enter` / `Shift+Enter` for the next or previous match, `N` / `Shift+N` for the next or previous error, `/` or `Ctrl+F` to search.

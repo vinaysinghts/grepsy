@@ -3,6 +3,7 @@
 // error navigation. Run with `npm run e2e` after `npm run build`.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { chromium } from 'playwright';
 
 const dist = fileURLToPath(new URL('../../dist', import.meta.url));
@@ -84,6 +85,28 @@ try {
   await page.locator('#log').focus();
   await page.keyboard.press('?');
   await page.waitForSelector('#shortcuts[open]');
+
+  await page.keyboard.press('Escape');
+
+  // A gzipped log with JSON in a line: decompressed on open, JSON shown pretty-printed.
+  await page.reload();
+  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO done'];
+  await page.setInputFiles('#file', { name: 'app.log.gz', mimeType: 'application/gzip', buffer: gzipSync(gzLines.join('\n')) });
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('3 rows'));
+  await page.waitForSelector('.json-btn');
+  assert.equal(await page.locator('.json-btn').count(), 1);
+  await page.click('.json-btn');
+  await page.waitForSelector('#json-dialog[open]');
+  assert.equal(await page.textContent('#json-body'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
+  await page.keyboard.press('Escape');
+
+  // Pasted text opens like a file.
+  await page.reload();
+  await page.click('#paste-btn');
+  await page.fill('#paste-input', '09:00 WARN pasted one\n09:01 INFO pasted two');
+  await page.click('#paste-open');
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('2 rows'));
+  assert.equal(await page.textContent('#file-name'), 'pasted.log');
 
   assert.deepEqual(errors, []);
   console.log('e2e: all checks passed');
