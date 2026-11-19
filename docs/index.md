@@ -22,6 +22,7 @@ Grepsy is a log viewer for Chrome, Edge, Brave and other Chromium browsers. Open
 ## Links
 
 - [Privacy policy](privacy)
+- [Terms of service](terms)
 - [Source code](https://github.com/vinaysinghts/loglens)
 - [Report a bug](https://github.com/vinaysinghts/loglens/issues/new/choose)
 - [Suggest a feature](https://github.com/vinaysinghts/loglens/discussions)
