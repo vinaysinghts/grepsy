@@ -1,3 +1,4 @@
+import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
 import { extractJson, mayContainJson } from '../core/json';
 import { LEVEL_COUNT } from '../core/lineStore';
@@ -75,7 +76,8 @@ $('paste-btn').addEventListener('click', () => {
 });
 $('paste-open').addEventListener('click', () => openPasted(pasteInput.value));
 document.addEventListener('paste', (e) => {
-  if (startScreen.hidden || e.target === pasteInput) return;
+  // A paste into a field (the URL box, the paste area) belongs to that field.
+  if (startScreen.hidden || isTextEntry(e.target as HTMLElement | null)) return;
   const text = e.clipboardData?.getData('text/plain');
   if (text) {
     e.preventDefault();
