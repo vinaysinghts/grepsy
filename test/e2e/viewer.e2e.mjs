@@ -125,16 +125,52 @@ try {
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('2 rows'));
   assert.equal(await page.textContent('#file-name'), 'pasted.log');
 
+  // Pasting a link into the URL box keeps it there instead of opening the
+  // link text as a log (issue #13).
+  await page.reload();
+  await page.click('#url-btn');
+  await page.focus('#url-input');
+  await page.evaluate(() => {
+    const input = document.querySelector('#url-input');
+    const data = new DataTransfer();
+    data.setData('text/plain', 'https://example.com/app.log');
+    input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await page.waitForTimeout(300);
+  assert.equal(await page.isHidden('#start'), false, 'start screen stays open');
+  assert.notEqual(await page.textContent('#file-name'), 'pasted.log');
+
   // ?src= loads a log by URL (used when a file:// log tab is redirected here).
   const server = createServer((req, res) => {
-    res.writeHead(200, { 'content-type': 'text/plain', 'access-control-allow-origin': '*' });
-    res.end(readFileSync(sample));
+    const cors = { 'access-control-allow-origin': '*' };
+    if (req.url === '/missing.log') {
+      res.writeHead(404, { 'content-type': 'text/plain', ...cors });
+      res.end('not found');
+    } else if (req.url === '/page.html') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', ...cors });
+      res.end('<!doctype html><title>Logs</title>');
+    } else {
+      res.writeHead(200, { 'content-type': 'text/plain', ...cors });
+      res.end(readFileSync(sample));
+    }
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const logUrl = `http://127.0.0.1:${server.address().port}/logs/remote.log`;
   await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(logUrl)}`);
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
   assert.equal(await page.textContent('#file-name'), 'remote.log');
+
+  // Failed downloads explain themselves instead of opening anything.
+  const base = `http://127.0.0.1:${server.address().port}`;
+  for (const [path, expected] of [
+    ['/missing.log', /answered 404 Not Found: the file was not found/],
+    ['/page.html', /web page, not a log file/],
+  ]) {
+    await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(base + path)}`);
+    await page.waitForSelector('#progress.error');
+    assert.match(await page.textContent('#progress'), expected);
+    assert.equal(await page.isHidden('#viewer'), true);
+  }
   server.close();
 
   // The auto-open card starts switched off.

@@ -1,4 +1,5 @@
 import { autoOpenView, fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
+import { HTML_PAGE_MESSAGE, httpFailureMessage, isHtmlResponse, networkFailureMessage } from '../core/download';
 
 /**
  * Downloads a log from a URL into a File. For web URLs the browser asks the
@@ -9,20 +10,22 @@ export async function fetchAsFile(url: string, askForAccess: boolean): Promise<F
   if (!isLoadableSource(url)) throw new Error('Only file, http and https links can be opened.');
   const u = new URL(url);
   if (askForAccess && u.protocol !== 'file:') {
-    const granted = await chrome.permissions.request({ origins: [`${u.origin}/*`] });
-    if (!granted) throw new Error(`Access to ${u.host} was not allowed.`);
+    let granted: boolean;
+    try {
+      granted = await chrome.permissions.request({ origins: [`${u.origin}/*`] });
+    } catch (err) {
+      throw new Error(`Could not ask for access to ${u.host}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    if (!granted) throw new Error(`Grepsy needs your OK to read from ${u.host}. Click Open again and choose Allow.`);
   }
   let res: Response;
   try {
     res = await fetch(url);
   } catch {
-    throw new Error(
-      u.protocol === 'file:'
-        ? 'Could not read the file. Check that "Allow access to file URLs" is on for this extension.'
-        : `Could not download from ${u.host}.`,
-    );
+    throw new Error(networkFailureMessage(url));
   }
-  if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(httpFailureMessage(u.host, res.status, res.statusText));
+  if (isHtmlResponse(res.headers.get('content-type'))) throw new Error(HTML_PAGE_MESSAGE);
   return new File([await res.blob()], fileNameFromUrl(url));
 }
 
