@@ -34,7 +34,7 @@ Built for speed: a 1 million line, 76 MB log is ready in under a second. Lines a
 
 Private by design: your files never leave your computer. No analytics, no accounts, no remote code. The only permission asked at install is storage for your highlight rules.
 
-Open source: https://github.com/vinaysinghts/loglens
+Open source: https://github.com/vinaysinghts/grepsy
 
 ## Single purpose (for the review form)
 
@@ -49,4 +49,4 @@ View, search and filter log files locally in the browser.
 
 ## Data usage disclosures
 
-Grepsy does not collect or transmit any user data. Privacy policy: https://vinaysinghts.github.io/loglens/privacy
+Grepsy does not collect or transmit any user data. Privacy policy: https://vinaysinghts.github.io/grepsy/privacy
