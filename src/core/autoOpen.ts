@@ -30,3 +30,53 @@ export function fileNameFromUrl(url: string): string {
     return 'download.log';
   }
 }
+
+export interface AutoOpenFacts {
+  /** The user asked for auto-open (saved setting). */
+  wanted: boolean;
+  /** Chrome granted the optional file:///* host permission. */
+  hasPermission: boolean;
+  /** "Allow access to file URLs" is on for the extension. */
+  fileAccess: boolean;
+  /** The user clicked "Turn on" while file access was still off. */
+  needsFileAccess: boolean;
+}
+
+export interface AutoOpenView {
+  on: boolean;
+  button: 'Turn on' | 'Turn off';
+  status: string;
+  /** Show the "Allow access to file URLs" step. */
+  showStep: boolean;
+}
+
+/**
+ * What the auto-open card shows. Chrome refuses to grant file:///* (it throws)
+ * until "Allow access to file URLs" is on, so that toggle is the first step,
+ * not the last.
+ */
+export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
+  const on = f.wanted && f.hasPermission && f.fileAccess;
+  if (on) {
+    return {
+      on,
+      button: 'Turn off',
+      status: 'On. Any .log file you open in this browser comes straight here.',
+      showStep: false,
+    };
+  }
+  if (!f.fileAccess && (f.needsFileAccess || f.wanted)) {
+    return {
+      on,
+      button: 'Turn on',
+      status: 'First, let Grepsy read local files. Then come back and click Turn on.',
+      showStep: true,
+    };
+  }
+  return {
+    on,
+    button: 'Turn on',
+    status: 'Any .log file you open in this browser comes straight here.',
+    showStep: false,
+  };
+}
