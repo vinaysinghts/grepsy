@@ -15,7 +15,7 @@ npm run e2e      # load dist/ in Chromium and click through the viewer
 
 ## Using it
 
-- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`), then drop or choose a log file, paste text, or open a URL. Gzipped logs (`.gz`) are decompressed automatically.
+- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`) for a small popup: open a file, paste text, paste a log link, or reopen a recent log. Each opens the viewer in a tab, where you can also drop a file. Gzipped logs (`.gz`) are decompressed automatically.
 - **Open .log files automatically (optional):** turn it on from the start screen. The extension then asks for file access, and `.log` files you open in the browser go straight to Grepsy.
 - **Search:** type in the search box. `Aa` matches case and `.*` switches to a regular expression.
 - **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.
@@ -36,7 +36,8 @@ To load it in your browser, open `chrome://extensions`, turn on **Developer mode
 | `src/core/` | Pure TypeScript: streaming line reader, level detection, line store, search, view model, virtual scrolling maths. No DOM or `chrome.*`, so it is unit tested. |
 | `src/worker/` | The parsing worker and its message protocol. Holds the file's lines off the main thread. |
 | `src/viewer/` | The viewer page UI. |
-| `src/background/` | Service worker: opens the viewer from the toolbar icon or `Ctrl+Shift+L`. |
+| `src/popup/` | Toolbar popup (`Ctrl+Shift+L`): quick ways to open a log, plus recently opened links. |
+| `src/background/` | Service worker: sends auto-opened local `.log` tabs to the viewer. |
 | `manifest.config.ts` | Generates `manifest.json` from `package.json` (name, version, description). |
 | `test/` | Vitest unit tests, plus `test/e2e/` for the browser test. |
 | `docs/adr/` | Architecture decision records. |

@@ -22,7 +22,8 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
     description: pkg.description,
     version: pkg.version,
     action: {
-      default_title: `Open ${pkg.displayName}`,
+      default_title: pkg.displayName,
+      default_popup: 'popup.html',
       default_icon: {
         16: 'icons/icon16.png',
         32: 'icons/icon32.png',
@@ -44,7 +45,7 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
     commands: {
       _execute_action: {
         suggested_key: { default: 'Ctrl+Shift+L', mac: 'Command+Shift+L' },
-        description: 'Open the log viewer',
+        description: 'Show the Grepsy popup',
       },
     },
     minimum_chrome_version: '116',

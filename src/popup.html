@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Grepsy</title>
+  <link rel="stylesheet" href="./viewer/styles.css">
+  <link rel="stylesheet" href="./popup/popup.css">
+</head>
+<body class="popup">
+  <header class="popup-head">
+    <div class="brand"><span class="logo" aria-hidden="true"></span>Grepsy</div>
+    <button type="button" class="tool-btn icon" data-theme-toggle><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg></button>
+  </header>
+  <div class="popup-actions">
+    <button type="button" class="tool-btn primary" id="open-file">Open a log file</button>
+    <button type="button" class="tool-btn" id="open-paste">Paste text</button>
+  </div>
+  <form class="url-box" id="url-form" novalidate>
+    <label for="url" class="sr-only">Log link</label>
+    <input id="url" type="text" placeholder="Paste a log link" autocomplete="off" spellcheck="false">
+    <button class="tool-btn">Open</button>
+  </form>
+  <p class="popup-error" id="url-error" role="alert" hidden></p>
+  <section aria-labelledby="recent-title">
+    <h2 class="popup-label" id="recent-title">Recent</h2>
+    <ul class="recent" id="recent"></ul>
+    <p class="muted popup-empty" id="recent-empty" hidden>Logs you open by link show up here.</p>
+  </section>
+  <footer class="popup-foot muted">
+    <span>Files stay on your computer.</span>
+    <span id="shortcut" title="Shows this popup"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></span>
+  </footer>
+  <script type="module" src="./popup/main.ts"></script>
+</body>
+</html>

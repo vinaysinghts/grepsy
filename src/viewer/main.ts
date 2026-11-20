@@ -7,7 +7,8 @@ import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
-import { fetchAsFile, setupAutoOpen } from './sources';
+import { rememberRecent } from '../core/recent';
+import { NetworkFailure, fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
 
 // First, so the page paints in the right theme.
@@ -108,14 +109,18 @@ $('home').addEventListener('click', () => {
 // script redirected a file:// log tab here.
 const urlBox = $<HTMLFormElement>('url-box');
 const urlInput = $<HTMLInputElement>('url-input');
-async function openUrl(url: string, askForAccess: boolean): Promise<void> {
+/** Opens a log by link; says whether it worked, and if not, whether the request got no answer at all. */
+async function openUrl(url: string, askForAccess: boolean): Promise<'ok' | 'network' | 'failed'> {
   progress.classList.remove('error');
   progress.textContent = `Downloading ${url}…`;
   try {
     open(await fetchAsFile(url, askForAccess));
+    void rememberRecent(chrome.storage.local, url);
+    return 'ok';
   } catch (err) {
     progress.classList.add('error');
     progress.textContent = (err as Error).message;
+    return err instanceof NetworkFailure ? 'network' : 'failed';
   }
 }
 $('url-btn').addEventListener('click', () => {
@@ -126,8 +131,24 @@ urlBox.addEventListener('submit', (e) => {
   e.preventDefault();
   void openUrl(urlInput.value.trim(), true);
 });
-const src = new URLSearchParams(location.search).get('src');
-if (src) void openUrl(src, false);
+// ?src= comes from the toolbar popup (a link or a recent log) or from an
+// auto-opened file:// tab. If the request got no answer and the site still
+// needs the user's OK (the browser blocks the response without it), fill in
+// the URL box and wait for a click: Chrome only shows the prompt after one.
+// A real answer such as a 404 is shown as it is.
+const params = new URLSearchParams(location.search);
+const src = params.get('src');
+if (src) {
+  void openUrl(src, false).then(async (result) => {
+    if (result !== 'network' || (await hasAccess(src).catch(() => true))) return;
+    urlBox.hidden = false;
+    urlInput.value = src;
+    urlInput.focus();
+    progress.classList.remove('error');
+    progress.textContent = `Click Open to let Grepsy read from ${new URL(src).host}.`;
+  });
+}
+if (params.has('paste')) $('paste-btn').click();
 void setupAutoOpen();
 
 // ---- Talking to the worker -----------------------------------------------

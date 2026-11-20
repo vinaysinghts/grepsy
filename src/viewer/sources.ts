@@ -2,6 +2,12 @@ import { autoOpenView, fileNameFromUrl, isLoadableSource } from '../core/autoOpe
 import { HTML_PAGE_MESSAGE, httpFailureMessage, isHtmlResponse, networkFailureMessage } from '../core/download';
 
 /**
+ * The request never got an answer: the site is down, or (for a site Grepsy
+ * has no access to) the browser blocked the response.
+ */
+export class NetworkFailure extends Error {}
+
+/**
  * Downloads a log from a URL into a File. For web URLs the browser asks the
  * user to allow access to just that site the first time (an optional
  * permission); file:// URLs need the auto-open setting.
@@ -22,7 +28,7 @@ export async function fetchAsFile(url: string, askForAccess: boolean): Promise<F
   try {
     res = await fetch(url);
   } catch {
-    throw new Error(networkFailureMessage(url));
+    throw new NetworkFailure(networkFailureMessage(url));
   }
   if (!res.ok) throw new Error(httpFailureMessage(u.host, res.status, res.statusText));
   if (isHtmlResponse(res.headers.get('content-type'))) throw new Error(HTML_PAGE_MESSAGE);
@@ -79,4 +85,15 @@ export async function setupAutoOpen(): Promise<void> {
   });
   window.addEventListener('focus', () => void refresh());
   await refresh();
+}
+
+/**
+ * Whether the viewer can download `url` without asking first. Web links need
+ * the site's optional permission; Chrome only shows that prompt after a click
+ * on this page, so a link handed over by the popup may have to wait for one.
+ */
+export async function hasAccess(url: string): Promise<boolean> {
+  const u = new URL(url);
+  if (u.protocol === 'file:') return true;
+  return chrome.permissions.contains({ origins: [`${u.origin}/*`] });
 }
