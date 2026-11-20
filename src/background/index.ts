@@ -1,12 +1,10 @@
 import { shouldAutoOpen } from '../core/autoOpen';
+import { viewerPath } from '../core/recent';
 
-const viewerUrl = (src?: string) =>
-  chrome.runtime.getURL('viewer.html') + (src ? `?src=${encodeURIComponent(src)}` : '');
+const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
 
-// Clicking the toolbar icon (or the keyboard shortcut) opens the viewer in a new tab.
-chrome.action.onClicked.addListener(() => {
-  void chrome.tabs.create({ url: viewerUrl() });
-});
+// The toolbar icon (and Ctrl+Shift+L) shows popup.html, set in the manifest;
+// every popup action opens the viewer in a tab.
 
 // Optional: when the user turned on "open .log files automatically" (which
 // grants file:// access), a tab that opens a local log is sent to the viewer.

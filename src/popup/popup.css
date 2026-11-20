@@ -1,0 +1,22 @@
+/* Toolbar popup. Reuses the viewer's tokens, so both themes come for free. */
+html:has(body.popup) { height: auto; }
+.popup { width: 320px; height: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; overflow: visible; }
+.popup-head { display: flex; align-items: center; justify-content: space-between; }
+.popup-actions { display: flex; gap: 8px; }
+.popup-actions .tool-btn { flex: 1; height: 32px; }
+.popup .tool-btn.primary { align-self: auto; }
+.popup .tool-btn.primary:hover { filter: brightness(1.1); background: var(--accent); color: var(--on-accent); }
+.popup-error { margin: -4px 0 0; font-size: 12px; color: var(--error-text); }
+.popup-label { margin: 4px 0 4px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.popup-empty { margin: 0; font-size: 12px; }
+.recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.recent li { display: flex; align-items: center; border-radius: 6px; }
+.recent li:hover, .recent li:focus-within { background: var(--raised); }
+.recent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 5px 6px; background: none; border: 0; text-align: left; cursor: pointer; }
+.recent-name { font-family: var(--mono); font-size: 12px; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-time { font-size: 11px; color: var(--muted); }
+.recent-from { grid-column: 1 / -1; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-remove { flex: none; width: 24px; height: 24px; margin-right: 4px; background: none; border: 0; border-radius: 4px; color: var(--muted); cursor: pointer; visibility: hidden; }
+.recent li:hover .recent-remove, .recent-remove:focus-visible { visibility: visible; }
+.recent-remove:hover { color: var(--text-strong); background: var(--border); }
+.popup-foot { display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; }
