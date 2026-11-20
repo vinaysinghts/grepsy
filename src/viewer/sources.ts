@@ -1,4 +1,4 @@
-import { fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
+import { autoOpenView, fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
 
 /**
  * Downloads a log from a URL into a File. For web URLs the browser asks the
@@ -34,29 +34,40 @@ export async function setupAutoOpen(): Promise<void> {
   const fileAccessBtn = document.getElementById('file-access-btn')!;
   if (!chrome.permissions || !chrome.storage) return;
 
+  let needsFileAccess = false;
   const refresh = async () => {
     const { autoOpen } = await chrome.storage.local.get('autoOpen');
-    const hasPermission = await chrome.permissions.contains({ origins: ['file:///*'] });
-    const on = autoOpen === true && hasPermission;
-    const fileAccess = await chrome.extension.isAllowedFileSchemeAccess();
-    btn.textContent = on ? 'Turn off' : 'Turn on';
-    btn.setAttribute('aria-pressed', String(on));
-    status.textContent = on
-      ? fileAccess
-        ? 'On. Any .log file you open in this browser comes straight here.'
-        : 'Almost on. Finish the step below.'
-      : 'Any .log file you open in this browser comes straight here.';
-    step.hidden = !on || fileAccess;
+    const view = autoOpenView({
+      wanted: autoOpen === true,
+      hasPermission: await chrome.permissions.contains({ origins: ['file:///*'] }),
+      fileAccess: await chrome.extension.isAllowedFileSchemeAccess(),
+      needsFileAccess,
+    });
+    btn.textContent = view.button;
+    btn.setAttribute('aria-pressed', String(view.on));
+    status.textContent = view.status;
+    step.hidden = !view.showStep;
   };
 
   btn.addEventListener('click', async () => {
     if (btn.getAttribute('aria-pressed') === 'true') {
+      needsFileAccess = false;
       await chrome.storage.local.set({ autoOpen: false });
       await chrome.permissions.remove({ origins: ['file:///*'] });
+    } else if (!(await chrome.extension.isAllowedFileSchemeAccess())) {
+      // Chrome throws "Extension must have file access enabled to request
+      // 'file:///*'" if we ask now, so guide the user to the toggle first.
+      needsFileAccess = true;
     } else {
-      // Must be called straight from the click so Chrome shows its prompt.
-      const granted = await chrome.permissions.request({ origins: ['file:///*'] });
-      if (granted) await chrome.storage.local.set({ autoOpen: true });
+      needsFileAccess = false;
+      try {
+        // Must follow the click closely so Chrome shows its prompt.
+        const granted = await chrome.permissions.request({ origins: ['file:///*'] });
+        if (granted) await chrome.storage.local.set({ autoOpen: true });
+      } catch (err) {
+        status.textContent = `Could not turn this on: ${err instanceof Error ? err.message : String(err)}`;
+        return;
+      }
     }
     await refresh();
   });
