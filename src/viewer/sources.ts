@@ -1,4 +1,4 @@
-import { fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
+import { autoOpenView, fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
 import { HTML_PAGE_MESSAGE, httpFailureMessage, isHtmlResponse, networkFailureMessage } from '../core/download';
 
 /**
