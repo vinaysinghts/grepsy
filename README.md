@@ -44,8 +44,10 @@ To load it in your browser, open `chrome://extensions`, turn on **Developer mode
 ## Release
 
 1. Bump `version` in `package.json` and merge to `main`.
-2. Tag it: `git tag v0.1.0 && git push origin v0.1.0`.
-3. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version, runs every test, builds `grepsy-<version>.zip` and attaches it to a GitHub release with generated notes.
+2. Start the release in either of two ways:
+   - On GitHub: **Actions → Release → Run workflow** on `main`. The workflow creates the `v<version>` tag itself.
+   - From a clone: `git tag v0.1.0 && git push origin v0.1.0`.
+3. The [release workflow](.github/workflows/release.yml) checks that the tag matches the version (and, when run by hand, that the tag doesn't exist yet), runs every test, builds `grepsy-<version>.zip` and attaches it to a GitHub release with generated notes.
 4. If the `CWS_*` secrets are set, it also uploads the zip to the Chrome Web Store as a draft. Submitting for review stays a manual step in the developer dashboard. Edge Add-ons takes the same zip, uploaded by hand.
 
 `npm run package` builds the zip locally. `npm run store:screenshots` regenerates the icons, promo tile and store screenshots. Listing copy is in [docs/store-listing.md](docs/store-listing.md) and the privacy policy in [docs/privacy.md](docs/privacy.md).
