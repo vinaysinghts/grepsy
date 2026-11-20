@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileNameFromUrl, isLoadableSource, shouldAutoOpen } from '../src/core/autoOpen';
+import { autoOpenView, fileNameFromUrl, isLoadableSource, shouldAutoOpen } from '../src/core/autoOpen';
 
 describe('shouldAutoOpen', () => {
   it.each([
@@ -37,5 +37,34 @@ describe('fileNameFromUrl', () => {
     expect(fileNameFromUrl('file:///var/log/my%20app.log')).toBe('my app.log');
     expect(fileNameFromUrl('https://x.dev/logs/a.log.gz?sig=1')).toBe('a.log.gz');
     expect(fileNameFromUrl('https://x.dev/')).toBe('download.log');
+  });
+});
+
+describe('autoOpenView', () => {
+  const off = { wanted: false, hasPermission: false, fileAccess: false, needsFileAccess: false };
+
+  it('starts off with no step', () => {
+    expect(autoOpenView(off)).toMatchObject({ on: false, button: 'Turn on', showStep: false });
+  });
+
+  it('asks for file access first when Turn on is clicked without it', () => {
+    const v = autoOpenView({ ...off, needsFileAccess: true });
+    expect(v).toMatchObject({ on: false, button: 'Turn on', showStep: true });
+    expect(v.status).toMatch(/First/);
+  });
+
+  it('is on only with the setting, the permission and file access', () => {
+    expect(autoOpenView({ wanted: true, hasPermission: true, fileAccess: true, needsFileAccess: false }))
+      .toMatchObject({ on: true, button: 'Turn off', showStep: false });
+  });
+
+  it('shows the step again if file access is switched off later', () => {
+    expect(autoOpenView({ wanted: true, hasPermission: true, fileAccess: false, needsFileAccess: false }))
+      .toMatchObject({ on: false, showStep: true });
+  });
+
+  it('hides the step once file access is on, ready for Turn on', () => {
+    expect(autoOpenView({ ...off, fileAccess: true, needsFileAccess: true }))
+      .toMatchObject({ on: false, button: 'Turn on', showStep: false });
   });
 });
