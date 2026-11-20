@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve Grepsy. Please [search open issues](https://github.com/vinaysinghts/loglens/issues?q=is%3Aissue) first. If yours is already there, add a 👍 to it instead.
+        Thanks for helping improve Grepsy. Please [search open issues](https://github.com/vinaysinghts/grepsy/issues?q=is%3Aissue) first. If yours is already there, add a 👍 to it instead.
 
         **Never paste private log content.** If a specific line triggers the bug, replace sensitive values with placeholders.
   - type: checkboxes

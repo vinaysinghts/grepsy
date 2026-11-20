@@ -10,7 +10,7 @@ Grepsy is a free, open-source browser extension for viewing log files. By instal
 
 ## License
 
-Grepsy is released under the [MIT License](https://github.com/vinaysinghts/loglens/blob/main/LICENSE). You may use, copy, modify and share it under that license.
+Grepsy is released under the [MIT License](https://github.com/vinaysinghts/grepsy/blob/main/LICENSE). You may use, copy, modify and share it under that license.
 
 ## Your data
 
@@ -26,4 +26,4 @@ These terms may be updated. The date at the top shows the latest version, and ch
 
 ## Contact
 
-Questions: open a discussion at https://github.com/vinaysinghts/loglens/discussions.
+Questions: open a discussion at https://github.com/vinaysinghts/grepsy/discussions.

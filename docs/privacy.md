@@ -34,4 +34,4 @@ The **Report a bug** link opens a GitHub issue form prefilled with the Grepsy ve
 
 ## Contact
 
-Questions about this policy: open a discussion at https://github.com/vinaysinghts/loglens/discussions.
+Questions about this policy: open a discussion at https://github.com/vinaysinghts/grepsy/discussions.
