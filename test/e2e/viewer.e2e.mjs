@@ -127,7 +127,9 @@ try {
 
   // ?src= loads a log by URL (used when a file:// log tab is redirected here).
   const server = createServer((req, res) => {
-    res.writeHead(200, { 'content-type': 'text/plain', 'access-control-allow-origin': '*' });
+    // /private/ pretends to be a site that doesn't allow extensions without host access.
+    const cors = req.url.startsWith('/private/') ? {} : { 'access-control-allow-origin': '*' };
+    res.writeHead(200, { 'content-type': 'text/plain', ...cors });
     res.end(readFileSync(sample));
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -135,6 +137,71 @@ try {
   await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(logUrl)}`);
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
   assert.equal(await page.textContent('#file-name'), 'remote.log');
+
+  // Toolbar popup: the icon shows it, and every action opens the viewer in a tab.
+  const manifest = JSON.parse(readFileSync(new URL('../../dist/manifest.json', import.meta.url), 'utf8'));
+  assert.equal(manifest.action.default_popup, 'popup.html');
+  const openPopup = async () => {
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.goto(`chrome-extension://${id}/popup.html`);
+    return p;
+  };
+  const viewerFrom = async (p, action) => {
+    // The popup closes itself once it has opened the tab, which can cut the click short.
+    const [tab] = await Promise.all([ctx.waitForEvent('page'), action(p).catch(() => {})]);
+    tab.on('pageerror', (e) => errors.push(e.message));
+    await tab.waitForLoadState();
+    return tab;
+  };
+  let popup = await openPopup();
+  // Logs opened by link are remembered.
+  await popup.waitForSelector('.recent-name');
+  assert.equal(await popup.textContent('.recent-name'), 'remote.log');
+  assert.equal(await popup.textContent('.recent-from'), new URL(logUrl).host);
+  // A bad link is caught in the popup.
+  await popup.fill('#url', 'javascript:alert(1)');
+  await popup.press('#url', 'Enter');
+  await popup.waitForSelector('#url-error:not([hidden])');
+  // A link opens in the viewer.
+  const otherUrl = logUrl.replace('remote.log', 'other.log');
+  await popup.fill('#url', otherUrl);
+  let tab = await viewerFrom(popup, (p) => p.press('#url', 'Enter'));
+  await tab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
+  assert.equal(await tab.textContent('#file-name'), 'other.log');
+  await tab.close();
+  if (!popup.isClosed()) await popup.close();
+
+  popup = await openPopup();
+  await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 2);
+  assert.deepEqual(await popup.locator('.recent-name').allTextContents(), ['other.log', 'remote.log']);
+  await popup.locator('.recent li').nth(1).hover();
+  await popup.locator('.recent-remove').nth(1).click();
+  await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 1);
+  tab = await viewerFrom(popup, (p) => p.click('.recent-open'));
+  await tab.waitForFunction(() => document.querySelector('#file-name')?.textContent === 'other.log');
+  await tab.close();
+  if (!popup.isClosed()) await popup.close();
+
+  popup = await openPopup();
+  tab = await viewerFrom(popup, (p) => p.click('#open-paste'));
+  await tab.waitForSelector('#paste-box:not([hidden])');
+  await tab.close();
+  if (!popup.isClosed()) await popup.close();
+
+  popup = await openPopup();
+  tab = await viewerFrom(popup, (p) => p.click('#open-file'));
+  await tab.waitForSelector('#drop');
+  await tab.close();
+  if (!popup.isClosed()) await popup.close();
+
+  // A link to a site Grepsy may not read yet waits in the URL box for a click,
+  // because Chrome only shows the permission prompt after one.
+  const privateUrl = logUrl.replace('/logs/', '/private/');
+  await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(privateUrl)}`);
+  await page.waitForFunction(() => document.querySelector('#progress')?.textContent.startsWith('Click Open'));
+  assert.equal(await page.inputValue('#url-input'), privateUrl);
+  assert.equal(await page.isVisible('#url-box'), true);
   server.close();
 
   // The auto-open card starts switched off.

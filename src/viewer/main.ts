@@ -6,7 +6,8 @@ import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
-import { fetchAsFile, setupAutoOpen } from './sources';
+import { rememberRecent } from '../core/recent';
+import { fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
 
 // First, so the page paints in the right theme.
@@ -106,14 +107,17 @@ $('home').addEventListener('click', () => {
 // script redirected a file:// log tab here.
 const urlBox = $<HTMLFormElement>('url-box');
 const urlInput = $<HTMLInputElement>('url-input');
-async function openUrl(url: string, askForAccess: boolean): Promise<void> {
+async function openUrl(url: string, askForAccess: boolean): Promise<boolean> {
   progress.classList.remove('error');
   progress.textContent = `Downloading ${url}…`;
   try {
     open(await fetchAsFile(url, askForAccess));
+    void rememberRecent(chrome.storage.local, url);
+    return true;
   } catch (err) {
     progress.classList.add('error');
     progress.textContent = (err as Error).message;
+    return false;
   }
 }
 $('url-btn').addEventListener('click', () => {
@@ -124,8 +128,23 @@ urlBox.addEventListener('submit', (e) => {
   e.preventDefault();
   void openUrl(urlInput.value.trim(), true);
 });
-const src = new URLSearchParams(location.search).get('src');
-if (src) void openUrl(src, false);
+// ?src= comes from the toolbar popup (a link or a recent log) or from an
+// auto-opened file:// tab. If the download fails because the site still needs
+// the user's OK, fill in the URL box and wait for a click: Chrome only shows
+// the permission prompt after one.
+const params = new URLSearchParams(location.search);
+const src = params.get('src');
+if (src) {
+  void openUrl(src, false).then(async (ok) => {
+    if (ok || (await hasAccess(src).catch(() => true))) return;
+    urlBox.hidden = false;
+    urlInput.value = src;
+    urlInput.focus();
+    progress.classList.remove('error');
+    progress.textContent = `Click Open to let Grepsy read from ${new URL(src).host}.`;
+  });
+}
+if (params.has('paste')) $('paste-btn').click();
 void setupAutoOpen();
 
 // ---- Talking to the worker -----------------------------------------------

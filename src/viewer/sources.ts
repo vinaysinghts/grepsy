@@ -77,3 +77,14 @@ export async function setupAutoOpen(): Promise<void> {
   window.addEventListener('focus', () => void refresh());
   await refresh();
 }
+
+/**
+ * Whether the viewer can download `url` without asking first. Web links need
+ * the site's optional permission; Chrome only shows that prompt after a click
+ * on this page, so a link handed over by the popup may have to wait for one.
+ */
+export async function hasAccess(url: string): Promise<boolean> {
+  const u = new URL(url);
+  if (u.protocol === 'file:') return true;
+  return chrome.permissions.contains({ origins: [`${u.origin}/*`] });
+}
