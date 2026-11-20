@@ -1,3 +1,4 @@
+import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
 import { extractJson, mayContainJson } from '../core/json';
 import { LEVEL_COUNT } from '../core/lineStore';
@@ -7,7 +8,7 @@ import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
 import { rememberRecent } from '../core/recent';
-import { fetchAsFile, hasAccess, setupAutoOpen } from './sources';
+import { NetworkFailure, fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
 
 // First, so the page paints in the right theme.
@@ -76,7 +77,8 @@ $('paste-btn').addEventListener('click', () => {
 });
 $('paste-open').addEventListener('click', () => openPasted(pasteInput.value));
 document.addEventListener('paste', (e) => {
-  if (startScreen.hidden || e.target === pasteInput) return;
+  // A paste into a field (the URL box, the paste area) belongs to that field.
+  if (startScreen.hidden || isTextEntry(e.target as HTMLElement | null)) return;
   const text = e.clipboardData?.getData('text/plain');
   if (text) {
     e.preventDefault();
@@ -107,17 +109,18 @@ $('home').addEventListener('click', () => {
 // script redirected a file:// log tab here.
 const urlBox = $<HTMLFormElement>('url-box');
 const urlInput = $<HTMLInputElement>('url-input');
-async function openUrl(url: string, askForAccess: boolean): Promise<boolean> {
+/** Opens a log by link; says whether it worked, and if not, whether the request got no answer at all. */
+async function openUrl(url: string, askForAccess: boolean): Promise<'ok' | 'network' | 'failed'> {
   progress.classList.remove('error');
   progress.textContent = `Downloading ${url}…`;
   try {
     open(await fetchAsFile(url, askForAccess));
     void rememberRecent(chrome.storage.local, url);
-    return true;
+    return 'ok';
   } catch (err) {
     progress.classList.add('error');
     progress.textContent = (err as Error).message;
-    return false;
+    return err instanceof NetworkFailure ? 'network' : 'failed';
   }
 }
 $('url-btn').addEventListener('click', () => {
@@ -129,14 +132,15 @@ urlBox.addEventListener('submit', (e) => {
   void openUrl(urlInput.value.trim(), true);
 });
 // ?src= comes from the toolbar popup (a link or a recent log) or from an
-// auto-opened file:// tab. If the download fails because the site still needs
-// the user's OK, fill in the URL box and wait for a click: Chrome only shows
-// the permission prompt after one.
+// auto-opened file:// tab. If the request got no answer and the site still
+// needs the user's OK (the browser blocks the response without it), fill in
+// the URL box and wait for a click: Chrome only shows the prompt after one.
+// A real answer such as a 404 is shown as it is.
 const params = new URLSearchParams(location.search);
 const src = params.get('src');
 if (src) {
-  void openUrl(src, false).then(async (ok) => {
-    if (ok || (await hasAccess(src).catch(() => true))) return;
+  void openUrl(src, false).then(async (result) => {
+    if (result !== 'network' || (await hasAccess(src).catch(() => true))) return;
     urlBox.hidden = false;
     urlInput.value = src;
     urlInput.focus();
