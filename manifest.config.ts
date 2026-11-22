@@ -8,8 +8,9 @@ import pkg from './package.json' with { type: 'json' };
  * manifest and does not let you edit it); `short_name` keeps the bare name
  * where space is tight.
  *
- * The only permission granted at install is `storage`, for saved highlight
- * rules; it shows no install warning. Host access is optional and requested
+ * Install-time permissions are `storage` (saved highlight rules) and
+ * `activeTab` + `scripting` (the popup's "Open this file in Grepsy"); none
+ * shows an install warning. Host access is optional and requested
  * at the moment a user turns on a feature that needs it. The viewer is an extension page that reads files the user
  * picks, so it needs no host or tab access. Fewer permissions also means a
  * faster, simpler store review.
@@ -37,7 +38,11 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
       48: 'icons/icon48.png',
       128: 'icons/icon128.png',
     },
-    permissions: ['storage'],
+    // activeTab + scripting: when the user clicks the icon, the popup may look
+    // at that one tab (its URL and content type) to offer "Open this file in
+    // Grepsy". Neither shows an install warning, and access ends when the tab
+    // navigates.
+    permissions: ['storage', 'activeTab', 'scripting'],
     // Asked for only when the user turns a feature on: file:// for opening
     // local logs automatically, and a site's origin when opening a log by URL.
     optional_host_permissions: ['file:///*', 'https://*/*', 'http://*/*'],

@@ -1,3 +1,4 @@
+/* global chrome */
 // Renders the extension icons, Chrome Web Store screenshots (1280x800) and
 // the small promo tile (440x280). Run after `npm run build`:
 //   npm run store:screenshots
@@ -75,8 +76,36 @@ const sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent('serviceworker'));
 const page = await ctx.newPage();
 // Theme is auto by default; headless Chromium reports a light system, so pin dark for the main shots.
 await page.emulateMedia({ colorScheme: 'dark' });
-await page.goto(`chrome-extension://${new URL(sw.url()).host}/viewer.html`);
-await page.screenshot({ path: join(root, 'store/1-start.png') });
+const extId = new URL(sw.url()).host;
+
+// 1: the popup offering to open the plain text log in the current tab, drawn
+// over a tab showing that log as Chrome does. Headless Chromium has no
+// toolbar, so the popup is rendered on its own (with the active tab stubbed)
+// and placed where Chrome would show it.
+const popupPage = await ctx.newPage();
+await popupPage.emulateMedia({ colorScheme: 'dark' });
+await popupPage.addInitScript(() => {
+  chrome.tabs.query = async () => [{ id: 1, url: 'file:///var/log/payments-service.log' }];
+  chrome.scripting.executeScript = async () => [{ result: 'text/plain' }];
+});
+await popupPage.goto(`chrome-extension://${extId}/popup.html`);
+await popupPage.waitForSelector('#this-tab:not([hidden])');
+await popupPage.waitForTimeout(200);
+const popupPng = await popupPage.locator('body').screenshot();
+await popupPage.close();
+const escape = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+await page.setContent(`
+  <body style="margin:0;height:800px;background:#fff;overflow:hidden;font-family:Inter,system-ui,sans-serif">
+    <div style="height:40px;background:#dfe3ea;display:flex;align-items:center;padding:0 12px;gap:10px">
+      <div style="flex:1;height:26px;border-radius:13px;background:#fff;color:#444;font-size:13px;display:flex;align-items:center;padding:0 14px">file:///var/log/payments-service.log</div>
+      <div style="width:28px;height:28px;border-radius:6px;background:#c7cdd8;display:flex;align-items:center;justify-content:center">${iconSvg(20)}</div>
+    </div>
+    <pre style="margin:8px;font:13px/1.35 monospace;color:#000;white-space:pre-wrap">${escape(demoLog().split('\n').slice(0, 60).join('\n'))}</pre>
+    <img src="data:image/png;base64,${popupPng.toString('base64')}" style="position:absolute;top:44px;right:12px;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.35)">
+  </body>`);
+await page.screenshot({ path: join(root, 'store/1-open-from-tab.png') });
+
+await page.goto(`chrome-extension://${extId}/viewer.html`);
 
 await page.setInputFiles('#file', logPath);
 await page.waitForSelector('#viewer:not([hidden]) .row .gutter');

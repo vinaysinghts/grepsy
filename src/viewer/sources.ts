@@ -70,10 +70,15 @@ export async function setupAutoOpen(): Promise<void> {
     } else {
       needsFileAccess = false;
       try {
-        // Must follow the click closely so Chrome shows its prompt.
+        // Must follow the click closely so Chrome shows its prompt. Chrome may
+        // close the toolbar popup while the prompt is up, so leave a note the
+        // background script uses to finish turning this on.
+        await chrome.storage.session.set({ pendingAutoOpen: Date.now() });
         const granted = await chrome.permissions.request({ origins: ['file:///*'] });
+        await chrome.storage.session.remove('pendingAutoOpen');
         if (granted) await chrome.storage.local.set({ autoOpen: true });
       } catch (err) {
+        await chrome.storage.session.remove('pendingAutoOpen');
         status.textContent = `Could not turn this on: ${err instanceof Error ? err.message : String(err)}`;
         return;
       }

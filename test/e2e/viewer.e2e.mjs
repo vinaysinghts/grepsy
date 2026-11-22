@@ -1,3 +1,4 @@
+/* global chrome */
 // End-to-end check: loads the built extension (dist/) in Chromium, opens a
 // log and exercises search, filter, context, gap expansion, bookmarks and
 // error navigation. Run with `npm run e2e` after `npm run build`.
@@ -182,18 +183,12 @@ try {
   await popup.waitForSelector('.recent-name');
   assert.equal(await popup.textContent('.recent-name'), 'remote.log');
   assert.equal(await popup.textContent('.recent-from'), new URL(logUrl).host);
-  // A bad link is caught in the popup.
-  await popup.fill('#url', 'javascript:alert(1)');
-  await popup.press('#url', 'Enter');
-  await popup.waitForSelector('#url-error:not([hidden])');
-  // A link opens in the viewer.
+  assert.equal(await popup.locator('#url').count(), 0, 'no link box: links open from their tab');
+  await popup.close();
+  // A second link, opened in the viewer, joins the list.
   const otherUrl = logUrl.replace('remote.log', 'other.log');
-  await popup.fill('#url', otherUrl);
-  let tab = await viewerFrom(popup, (p) => p.press('#url', 'Enter'));
-  await tab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
-  assert.equal(await tab.textContent('#file-name'), 'other.log');
-  await tab.close();
-  if (!popup.isClosed()) await popup.close();
+  await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(otherUrl)}`);
+  await page.waitForFunction(() => document.querySelector('#file-name')?.textContent === 'other.log');
 
   popup = await openPopup();
   await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 2);
@@ -201,7 +196,7 @@ try {
   await popup.locator('.recent li').nth(1).hover();
   await popup.locator('.recent-remove').nth(1).click();
   await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 1);
-  tab = await viewerFrom(popup, (p) => p.click('.recent-open'));
+  let tab = await viewerFrom(popup, (p) => p.click('.recent-open'));
   await tab.waitForFunction(() => document.querySelector('#file-name')?.textContent === 'other.log');
   await tab.close();
   if (!popup.isClosed()) await popup.close();
@@ -217,6 +212,47 @@ try {
   await tab.waitForSelector('#drop');
   await tab.close();
   if (!popup.isClosed()) await popup.close();
+
+  // On a plain text tab the popup offers to open that tab in place. Headless
+  // Chromium can't click the toolbar icon (which grants activeTab), so the
+  // popup is told which tab is active and what it shows; the rest is real.
+  const popupForTab = async (url, contentType) => {
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.addInitScript(
+      ({ url, contentType }) => {
+        const query = chrome.tabs.query.bind(chrome.tabs);
+        chrome.tabs.query = async () => {
+          const me = await chrome.tabs.getCurrent();
+          const [tab] = (await query({})).filter((t) => t.id !== me.id).sort((a, b) => b.id - a.id);
+          return [{ ...tab, url }];
+        };
+        chrome.scripting.executeScript = async () => [{ result: contentType }];
+        chrome.permissions.contains = async () => true;
+      },
+      { url, contentType },
+    );
+    await p.goto(`chrome-extension://${id}/popup.html`);
+    return p;
+  };
+  const textTab = await ctx.newPage();
+  await textTab.goto(logUrl);
+  popup = await popupForTab(logUrl, 'text/plain');
+  await popup.waitForSelector('#this-tab:not([hidden])');
+  assert.equal(await popup.textContent('#tab-name'), 'remote.log');
+  assert.equal(await popup.getAttribute('#open-file', 'class'), 'tool-btn', 'the tab offer is the main action');
+  await Promise.all([textTab.waitForURL(/viewer\.html\?src=/), popup.click('#open-tab').catch(() => {})]);
+  await textTab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
+  assert.equal(await textTab.textContent('#file-name'), 'remote.log');
+  if (!popup.isClosed()) await popup.close();
+  // Web pages never get the offer, even with a log-like URL.
+  await textTab.goto(`${new URL(logUrl).origin}/page.html`);
+  popup = await popupForTab(`${new URL(logUrl).origin}/app.log`, 'text/html');
+  await popup.waitForSelector('.popup-foot');
+  await popup.waitForTimeout(200);
+  assert.equal(await popup.isHidden('#this-tab'), true);
+  await popup.close();
+  await textTab.close();
 
   // A link to a site Grepsy may not read yet waits in the URL box for a click,
   // because Chrome only shows the permission prompt after one.
@@ -238,6 +274,12 @@ try {
     assert.equal(await page.isHidden('#viewer'), true);
   }
   server.close();
+
+  // The popup carries the same switch, also off.
+  popup = await openPopup();
+  await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  assert.match(await popup.textContent('#auto-open-title'), /Always open \.log files/);
+  await popup.close();
 
   // The auto-open card starts switched off.
   await page.goto(`chrome-extension://${id}/viewer.html`);

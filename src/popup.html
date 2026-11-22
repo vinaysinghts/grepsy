@@ -11,20 +11,36 @@
     <div class="brand"><span class="logo" aria-hidden="true"></span>Grepsy</div>
     <button type="button" class="tool-btn icon" data-theme-toggle><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg></button>
   </header>
+  <section class="this-tab" id="this-tab" hidden>
+    <button type="button" class="tool-btn primary this-tab-btn" id="open-tab">Open this file in Grepsy</button>
+    <p class="this-tab-name"><span id="tab-name"></span> <span class="muted" id="tab-from"></span></p>
+    <div class="this-tab-step" id="tab-step" hidden>
+      <p id="tab-step-text">First, let Grepsy read local files: turn on <b>Allow access to file URLs</b>, then click the Grepsy icon again.</p>
+      <button type="button" class="tool-btn" id="tab-step-btn">Open extension settings</button>
+    </div>
+    <p class="popup-error" id="tab-error" role="alert" hidden></p>
+  </section>
   <div class="popup-actions">
     <button type="button" class="tool-btn primary" id="open-file">Open a log file</button>
     <button type="button" class="tool-btn" id="open-paste">Paste text</button>
   </div>
-  <form class="url-box" id="url-form" novalidate>
-    <label for="url" class="sr-only">Log link</label>
-    <input id="url" type="text" placeholder="Paste a log link" autocomplete="off" spellcheck="false">
-    <button class="tool-btn">Open</button>
-  </form>
-  <p class="popup-error" id="url-error" role="alert" hidden></p>
   <section aria-labelledby="recent-title">
     <h2 class="popup-label" id="recent-title">Recent</h2>
     <ul class="recent" id="recent"></ul>
-    <p class="muted popup-empty" id="recent-empty" hidden>Logs you open by link show up here.</p>
+    <p class="muted popup-empty" id="recent-empty" hidden>Logs you open from a tab or a link show up here.</p>
+  </section>
+  <section class="popup-auto" id="auto-open" aria-labelledby="auto-open-title">
+    <div class="popup-auto-row">
+      <div>
+        <h2 class="popup-auto-title" id="auto-open-title">Always open .log files in Grepsy</h2>
+        <p class="muted" id="auto-open-status">Local .log files you open in Chrome open in Grepsy.</p>
+      </div>
+      <button type="button" class="tool-btn" id="auto-open-btn">Turn on</button>
+    </div>
+    <div class="this-tab-step" id="file-access-step" hidden>
+      <p>On Grepsy's details page, turn on <b>Allow access to file URLs</b>. Then open Grepsy again and click Turn on.</p>
+      <button type="button" class="tool-btn" id="file-access-btn">Open extension settings</button>
+    </div>
   </section>
   <footer class="popup-foot muted">
     <span>Files stay on your computer.</span>

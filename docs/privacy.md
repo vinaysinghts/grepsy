@@ -1,6 +1,6 @@
 # Grepsy privacy policy
 
-_Last updated: 18 November 2026_
+_Last updated: 22 November 2026_
 
 Grepsy is a log viewer that runs entirely inside your browser.
 
@@ -23,8 +23,9 @@ Grepsy is a log viewer that runs entirely inside your browser.
 | Permission | When it is asked | Why |
 | --- | --- | --- |
 | `storage` | At install (shows no warning) | Saves your highlight rules. |
+| `activeTab`, `scripting` | At install (show no warning) | Only when you click the Grepsy icon: checks whether the current tab is a plain text file, so the popup can offer to open it. Nothing from the page is read or sent. |
 | Access to `file:///*` | Only if you turn on "Open .log files automatically" | Sends `.log` files you open in the browser to the viewer. |
-| Access to `http://*/*`, `https://*/*` | Only when you open a log from a URL, and only for that site | Downloads the log you asked for. |
+| Access to `http://*/*`, `https://*/*` | Only when you open a log from a URL or from the current tab, and only for that site | Downloads the log you asked for. |
 
 You can remove optional permissions at any time on the extension's details page.
 

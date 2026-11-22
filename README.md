@@ -15,7 +15,7 @@ npm run e2e      # load dist/ in Chromium and click through the viewer
 
 ## Using it
 
-- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`) for a small popup: open a file, paste text, paste a log link, or reopen a recent log. Each opens the viewer in a tab, where you can also drop a file. Gzipped logs (`.gz`) are decompressed automatically.
+- **Open:** click the toolbar icon (or press `Ctrl+Shift+L`) for a small popup. If the tab shows a plain text log, **Open this file in Grepsy** turns that tab into the viewer. You can also open a file, paste text, reopen a recent log, or turn on "Always open .log files in Grepsy". The viewer also takes dropped files and log URLs. Gzipped logs (`.gz`) are decompressed automatically.
 - **Open .log files automatically (optional):** turn it on from the start screen. The extension then asks for file access, and `.log` files you open in the browser go straight to Grepsy.
 - **Search:** type in the search box. `Aa` matches case and `.*` switches to a regular expression.
 - **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.

@@ -61,7 +61,7 @@ export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
     return {
       on,
       button: 'Turn off',
-      status: 'On. Any .log file you open in this browser comes straight here.',
+      status: 'On. Local .log files you open in Chrome open in Grepsy.',
       showStep: false,
     };
   }
@@ -69,14 +69,14 @@ export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
     return {
       on,
       button: 'Turn on',
-      status: 'First, let Grepsy read local files. Then come back and click Turn on.',
+      status: 'First, let Grepsy read local files. Then open Grepsy again and click Turn on.',
       showStep: true,
     };
   }
   return {
     on,
     button: 'Turn on',
-    status: 'Any .log file you open in this browser comes straight here.',
+    status: 'Local .log files you open in Chrome open in Grepsy.',
     showStep: false,
   };
 }
