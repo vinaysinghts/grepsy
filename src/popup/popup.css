@@ -20,3 +20,10 @@ html:has(body.popup) { height: auto; }
 .recent li:hover .recent-remove, .recent-remove:focus-visible { visibility: visible; }
 .recent-remove:hover { color: var(--text-strong); background: var(--border); }
 .popup-foot { display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; }
+/* "Open this file in Grepsy": only shown when the active tab is a plain text file. */
+.this-tab { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.this-tab-btn { height: 36px; font-size: 13px; }
+.this-tab-name { margin: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.this-tab-name #tab-name { font-family: var(--mono); color: var(--text-strong); }
+.this-tab-step { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.this-tab-step p { margin: 0; }

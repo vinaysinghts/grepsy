@@ -218,6 +218,47 @@ try {
   await tab.close();
   if (!popup.isClosed()) await popup.close();
 
+  // On a plain text tab the popup offers to open that tab in place. Headless
+  // Chromium can't click the toolbar icon (which grants activeTab), so the
+  // popup is told which tab is active and what it shows; the rest is real.
+  const popupForTab = async (url, contentType) => {
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.addInitScript(
+      ({ url, contentType }) => {
+        const query = chrome.tabs.query.bind(chrome.tabs);
+        chrome.tabs.query = async () => {
+          const me = await chrome.tabs.getCurrent();
+          const [tab] = (await query({})).filter((t) => t.id !== me.id).sort((a, b) => b.id - a.id);
+          return [{ ...tab, url }];
+        };
+        chrome.scripting.executeScript = async () => [{ result: contentType }];
+        chrome.permissions.contains = async () => true;
+      },
+      { url, contentType },
+    );
+    await p.goto(`chrome-extension://${id}/popup.html`);
+    return p;
+  };
+  const textTab = await ctx.newPage();
+  await textTab.goto(logUrl);
+  popup = await popupForTab(logUrl, 'text/plain');
+  await popup.waitForSelector('#this-tab:not([hidden])');
+  assert.equal(await popup.textContent('#tab-name'), 'remote.log');
+  assert.equal(await popup.getAttribute('#open-file', 'class'), 'tool-btn', 'the tab offer is the main action');
+  await Promise.all([textTab.waitForURL(/viewer\.html\?src=/), popup.click('#open-tab').catch(() => {})]);
+  await textTab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
+  assert.equal(await textTab.textContent('#file-name'), 'remote.log');
+  if (!popup.isClosed()) await popup.close();
+  // Web pages never get the offer, even with a log-like URL.
+  await textTab.goto(`${new URL(logUrl).origin}/page.html`);
+  popup = await popupForTab(`${new URL(logUrl).origin}/app.log`, 'text/html');
+  await popup.waitForSelector('.popup-foot');
+  await popup.waitForTimeout(200);
+  assert.equal(await popup.isHidden('#this-tab'), true);
+  await popup.close();
+  await textTab.close();
+
   // A link to a site Grepsy may not read yet waits in the URL box for a click,
   // because Chrome only shows the permission prompt after one.
   const privateUrl = logUrl.replace('/logs/', '/private/');

@@ -1,4 +1,5 @@
 import { shouldAutoOpen } from '../core/autoOpen';
+import { pendingToRun } from '../core/currentTab';
 import { viewerPath } from '../core/recent';
 
 const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
@@ -14,5 +15,18 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
   if (!url || !shouldAutoOpen(url)) return;
   void chrome.storage.local.get('autoOpen').then(({ autoOpen }) => {
     if (autoOpen === true) void chrome.tabs.update(tabId, { url: viewerUrl(url) });
+  });
+});
+
+// "Open this file in Grepsy" in the popup may first need the user to allow
+// the site (or local files). Chrome can close the popup while its prompt is
+// up, so the popup leaves the request in session storage and this finishes
+// it once the permission is granted.
+chrome.permissions.onAdded.addListener(() => {
+  void chrome.storage.session.get('pendingOpen').then(async ({ pendingOpen }) => {
+    const run = pendingToRun(pendingOpen, Date.now());
+    if (!run || !(await chrome.permissions.contains({ origins: [run.origin] }))) return;
+    await chrome.storage.session.remove('pendingOpen');
+    await chrome.tabs.update(run.tabId, { url: viewerUrl(run.url) });
   });
 });
