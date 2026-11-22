@@ -1,3 +1,4 @@
+/* global chrome */
 // End-to-end check: loads the built extension (dist/) in Chromium, opens a
 // log and exercises search, filter, context, gap expansion, bookmarks and
 // error navigation. Run with `npm run e2e` after `npm run build`.

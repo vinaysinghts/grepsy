@@ -1,3 +1,4 @@
+/* global chrome */
 // Renders the extension icons, Chrome Web Store screenshots (1280x800) and
 // the small promo tile (440x280). Run after `npm run build`:
 //   npm run store:screenshots
