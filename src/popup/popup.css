@@ -27,3 +27,10 @@ html:has(body.popup) { height: auto; }
 .this-tab-name #tab-name { font-family: var(--mono); color: var(--text-strong); }
 .this-tab-step { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 .this-tab-step p { margin: 0; }
+/* "Always open .log files in Grepsy": the same switch as the start screen's card. */
+.popup-auto { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.popup-auto-row { display: flex; align-items: center; gap: 10px; }
+.popup-auto-row > div { flex: 1; min-width: 0; }
+.popup-auto-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-strong); }
+.popup-auto-row p { margin: 2px 0 0; font-size: 11px; }
+.popup-auto-row .tool-btn { flex: none; }

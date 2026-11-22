@@ -281,6 +281,12 @@ try {
   }
   server.close();
 
+  // The popup carries the same switch, also off.
+  popup = await openPopup();
+  await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  assert.match(await popup.textContent('#auto-open-title'), /Always open \.log files/);
+  await popup.close();
+
   // The auto-open card starts switched off.
   await page.goto(`chrome-extension://${id}/viewer.html`);
   await page.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');

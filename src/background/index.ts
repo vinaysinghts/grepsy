@@ -1,5 +1,5 @@
 import { shouldAutoOpen } from '../core/autoOpen';
-import { pendingToRun } from '../core/currentTab';
+import { PENDING_TTL_MS, pendingToRun } from '../core/currentTab';
 import { viewerPath } from '../core/recent';
 
 const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
@@ -23,6 +23,13 @@ chrome.tabs.onUpdated.addListener((tabId, info) => {
 // up, so the popup leaves the request in session storage and this finishes
 // it once the permission is granted.
 chrome.permissions.onAdded.addListener(() => {
+  // "Always open .log files" asked for file:///* from the popup.
+  void chrome.storage.session.get('pendingAutoOpen').then(async ({ pendingAutoOpen }) => {
+    if (typeof pendingAutoOpen !== 'number' || Date.now() - pendingAutoOpen > PENDING_TTL_MS) return;
+    if (!(await chrome.permissions.contains({ origins: ['file:///*'] }))) return;
+    await chrome.storage.session.remove('pendingAutoOpen');
+    await chrome.storage.local.set({ autoOpen: true });
+  });
   void chrome.storage.session.get('pendingOpen').then(async ({ pendingOpen }) => {
     const run = pendingToRun(pendingOpen, Date.now());
     if (!run || !(await chrome.permissions.contains({ origins: [run.origin] }))) return;

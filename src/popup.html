@@ -35,6 +35,19 @@
     <ul class="recent" id="recent"></ul>
     <p class="muted popup-empty" id="recent-empty" hidden>Logs you open by link show up here.</p>
   </section>
+  <section class="popup-auto" id="auto-open" aria-labelledby="auto-open-title">
+    <div class="popup-auto-row">
+      <div>
+        <h2 class="popup-auto-title" id="auto-open-title">Always open .log files in Grepsy</h2>
+        <p class="muted" id="auto-open-status">Local .log files you open in Chrome open in Grepsy.</p>
+      </div>
+      <button type="button" class="tool-btn" id="auto-open-btn">Turn on</button>
+    </div>
+    <div class="this-tab-step" id="file-access-step" hidden>
+      <p>On Grepsy's details page, turn on <b>Allow access to file URLs</b>. Then open Grepsy again and click Turn on.</p>
+      <button type="button" class="tool-btn" id="file-access-btn">Open extension settings</button>
+    </div>
+  </section>
   <footer class="popup-foot muted">
     <span>Files stay on your computer.</span>
     <span id="shortcut" title="Shows this popup"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></span>

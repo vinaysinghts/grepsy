@@ -20,3 +20,7 @@ People often already have a log open in a tab: a local `.log` or `.txt` shown by
 - One click to go from a plain text log tab to the viewer, in the same tab.
 - The decision logic (`src/core/currentTab.ts`) is pure and unit tested. The e2e test drives the real popup and tab navigation, but stubs the active tab lookup, because headless Chromium can't click the toolbar icon to grant `activeTab`.
 - Granting `file:///*` this way doesn't turn on auto-open; that stays a separate choice.
+
+## Addendum: auto-open in the popup
+
+The "Open .log files automatically" switch (ADR 5) was only on the viewer's start screen, which people rarely see now that the icon shows the popup. The popup now carries the same switch as **Always open .log files in Grepsy**, sharing `setupAutoOpen`. As with the tab offer, if Chrome closes the popup during the `file:///*` prompt, a note in `chrome.storage.session` lets the background script finish turning it on.
