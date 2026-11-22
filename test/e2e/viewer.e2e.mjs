@@ -47,8 +47,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
   // Revealed lines can be hidden again, back to the filtered view.
   await page.waitForSelector('.row.revealed');
-  assert.match(await page.textContent('.hide-btn'), /^Hide \d+ lines?$/);
-  await page.click('.hide-btn');
+  assert.match(await page.getAttribute('.row .fold', 'title'), /^Hide \d+ lines? again$/);
+  await page.click('.row .fold');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
   assert.equal(await page.locator('.row.revealed').count(), 0);
   await page.locator('.gap').last().click();

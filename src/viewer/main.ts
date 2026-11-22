@@ -280,17 +280,19 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   div.append(gutter, text);
   if (row.revealed) {
     const { start, end, count } = row.revealed;
-    const hide = document.createElement('button');
-    hide.type = 'button';
-    hide.className = 'hide-btn';
-    hide.textContent = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'}`;
-    hide.title = 'Hide the lines you revealed here again';
-    hide.addEventListener('click', () => {
+    // A fold arrow, like a code editor's: ⌄ on an opened run folds it back.
+    const fold = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'fold';
+    fold.textContent = '⌄';
+    const label = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'} again`;
+    fold.title = label;
+    fold.setAttribute('aria-label', label);
+    fold.addEventListener('click', () => {
       state.viewId++;
       send({ type: 'collapse', id: state.viewId, start, end });
     });
-    // Before the text, so it stays on screen however long the line is.
-    gutter.after(hide);
+    div.prepend(fold);
   }
   if (mayContainJson(row.text)) {
     const found = extractJson(row.text);
@@ -318,6 +320,10 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'gap';
+  const fold = document.createElement('span');
+  fold.className = 'fold';
+  fold.setAttribute('aria-hidden', 'true');
+  fold.textContent = '›';
   const g = document.createElement('span');
   g.className = 'gutter';
   g.textContent = '⋯';
@@ -325,7 +331,7 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   label.textContent = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden, click to show`;
   const line = document.createElement('span');
   line.className = 'line';
-  btn.append(g, label, line);
+  btn.append(fold, g, label, line);
   btn.addEventListener('click', () => {
     state.viewId++;
     send({ type: 'expand', id: state.viewId, start: row.start, end: row.end });
