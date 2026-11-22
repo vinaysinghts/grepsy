@@ -45,6 +45,14 @@ try {
   await page.waitForSelector('.gap');
   await page.locator('.gap').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
+  // Revealed lines can be hidden again, back to the filtered view.
+  await page.waitForSelector('.row.revealed');
+  assert.match(await page.textContent('.hide-btn'), /^Hide \d+ lines?$/);
+  await page.click('.hide-btn');
+  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
+  assert.equal(await page.locator('.row.revealed').count(), 0);
+  await page.locator('.gap').last().click();
+  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
 
   await page.locator('.row .gutter').first().click();
   await page.waitForSelector('.row.bookmarked');
@@ -240,7 +248,7 @@ try {
   popup = await popupForTab(logUrl, 'text/plain');
   await popup.waitForSelector('#this-tab:not([hidden])');
   assert.equal(await popup.textContent('#tab-name'), 'remote.log');
-  assert.equal(await popup.getAttribute('#open-file', 'class'), 'tool-btn', 'the tab offer is the main action');
+  assert.equal(await popup.isHidden('#open-file'), true, 'on a text tab, opening that tab is the only action');
   await Promise.all([textTab.waitForURL(/viewer\.html\?src=/), popup.click('#open-tab').catch(() => {})]);
   await textTab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
   assert.equal(await textTab.textContent('#file-name'), 'remote.log');

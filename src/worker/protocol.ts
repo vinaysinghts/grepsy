@@ -14,12 +14,26 @@ export type Request =
   | { type: 'open'; file: File }
   | { type: 'view'; id: number; query: ViewQuery }
   | { type: 'expand'; id: number; start: number; end: number }
+  | { type: 'collapse'; id: number; start: number; end: number }
   | { type: 'bookmark'; id: number; line: number }
   | { type: 'rows'; id: number; start: number; count: number }
   | { type: 'find'; id: number; fromRow: number; direction: 1 | -1; target: 'match' | 'error' | 'bookmark' };
 
 export type Row =
-  | { kind: 'line'; line: number; text: string; level: number; bookmarked: boolean }
+  | {
+      kind: 'line';
+      line: number;
+      text: string;
+      level: number;
+      bookmarked: boolean;
+      /**
+       * Set on the first line of a run the user revealed from a gap: the
+       * lines that run covers, so it can be hidden again.
+       */
+      revealed?: { start: number; end: number; count: number };
+      /** Shown only because the user revealed it from a gap. */
+      extra?: boolean;
+    }
   | { kind: 'gap'; start: number; end: number };
 
 export type Response =

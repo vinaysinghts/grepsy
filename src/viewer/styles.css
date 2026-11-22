@@ -192,6 +192,10 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 
 .json-btn { flex: none; align-self: center; height: 16px; margin-left: 8px; padding: 0 5px; background: var(--raised); color: var(--link); border: 1px solid var(--border); border-radius: 4px; font: 500 10px/14px Inter, sans-serif; cursor: pointer; }
 .json-btn:hover { border-color: var(--accent); }
+.row.revealed .gutter { border-right-style: dashed; }
+.hide-btn { flex: none; align-self: center; height: 16px; margin: 0 8px 0 0; padding: 0 6px; background: var(--raised); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; font: 500 10px/14px Inter, sans-serif; cursor: pointer; }
+.hide-btn::before { content: '▴ '; }
+.hide-btn:hover { color: var(--text-strong); border-color: var(--accent); }
 .json-dialog { width: min(720px, 90vw); }
 .json-dialog pre { max-height: 60vh; overflow: auto; margin: 0 0 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); color: var(--text-strong); }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }

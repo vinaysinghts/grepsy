@@ -17,6 +17,8 @@ let query: ViewQuery | null = null;
 let matcher: RegExp | null = null;
 const bookmarks = new Set<number>();
 let expanded = new Uint8Array(0);
+/** The gaps the user opened, as [start, end) line ranges, so each can be closed again. */
+let opened: Array<[number, number]> = [];
 
 function post(msg: Response): void {
   self.postMessage(msg);
@@ -46,6 +48,7 @@ async function open(file: File): Promise<void> {
   store = next;
   bookmarks.clear();
   expanded = new Uint8Array(store.length);
+  opened = [];
   rows = new Int32Array(0);
   post({ type: 'loaded', lines: store.length, counts: [...store.counts], ms: Math.round(performance.now() - started) });
 }
@@ -88,6 +91,12 @@ function rebuild(id: number): void {
   });
 }
 
+/** The opened range holding `line`, if it was revealed from a gap. */
+function openedRange(line: number): [number, number] | undefined {
+  if (expanded[line] !== 1) return undefined;
+  return opened.find(([s, e]) => line >= s && line < e);
+}
+
 function getRows(id: number, start: number, count: number): void {
   const out: Row[] = [];
   const end = Math.min(rows.length, start + count);
@@ -97,7 +106,19 @@ function getRows(id: number, start: number, count: number): void {
       const [s, e] = gapRange(rows, r, store.length);
       out.push({ kind: 'gap', start: s, end: e });
     } else {
-      out.push({ kind: 'line', line: v, text: store.text(v), level: store.level(v), bookmarked: bookmarks.has(v) });
+      const row: Row = { kind: 'line', line: v, text: store.text(v), level: store.level(v), bookmarked: bookmarks.has(v) };
+      const range = openedRange(v);
+      if (range) {
+        row.extra = true;
+        // The first row of the run carries the "hide again" control.
+        const prev = r > 0 ? rows[r - 1]! : -1;
+        if (prev < range[0]) {
+          let n = 0;
+          for (let i = range[0]; i < range[1]; i++) if (expanded[i] === 1) n++;
+          row.revealed = { start: range[0], end: range[1], count: n };
+        }
+      }
+      out.push(row);
     }
   }
   post({ type: 'rows', id, start, rows: out });
@@ -135,10 +156,18 @@ self.onmessage = (e: MessageEvent<Request>) => {
     case 'view':
       query = m.query;
       expanded.fill(0);
+      opened = [];
       rebuild(m.id);
       break;
     case 'expand':
       expanded.fill(1, m.start, m.end);
+      opened.push([m.start, m.end]);
+      rebuild(m.id);
+      break;
+    case 'collapse':
+      opened = opened.filter(([s, e]) => !(s === m.start && e === m.end));
+      expanded.fill(0, m.start, m.end);
+      for (const [s, e] of opened) expanded.fill(1, s, e);
       rebuild(m.id);
       break;
     case 'bookmark':

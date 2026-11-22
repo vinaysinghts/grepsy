@@ -3,6 +3,7 @@ html:has(body.popup) { height: auto; }
 .popup { width: 320px; height: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; overflow: visible; }
 .popup-head { display: flex; align-items: center; justify-content: space-between; }
 .popup-actions { display: flex; gap: 8px; }
+.popup-actions[hidden] { display: none; }
 .popup-actions .tool-btn { flex: 1; height: 32px; }
 .popup .tool-btn.primary { align-self: auto; }
 .popup .tool-btn.primary:hover { filter: brightness(1.1); background: var(--accent); color: var(--on-accent); }

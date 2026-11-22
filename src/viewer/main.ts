@@ -248,7 +248,11 @@ function draw(): void {
 
 function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement {
   const div = document.createElement('div');
-  div.className = `row lv${row.level}` + (row.bookmarked ? ' bookmarked' : '') + (index === state.current ? ' current' : '');
+  div.className =
+    `row lv${row.level}` +
+    (row.bookmarked ? ' bookmarked' : '') +
+    (row.extra ? ' revealed' : '') +
+    (index === state.current ? ' current' : '');
   const gutter = document.createElement('button');
   gutter.type = 'button';
   gutter.className = 'gutter';
@@ -274,6 +278,20 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
     }
   }
   div.append(gutter, text);
+  if (row.revealed) {
+    const { start, end, count } = row.revealed;
+    const hide = document.createElement('button');
+    hide.type = 'button';
+    hide.className = 'hide-btn';
+    hide.textContent = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'}`;
+    hide.title = 'Hide the lines you revealed here again';
+    hide.addEventListener('click', () => {
+      state.viewId++;
+      send({ type: 'collapse', id: state.viewId, start, end });
+    });
+    // Before the text, so it stays on screen however long the line is.
+    gutter.after(hide);
+  }
   if (mayContainJson(row.text)) {
     const found = extractJson(row.text);
     if (found) {

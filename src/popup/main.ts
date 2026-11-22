@@ -149,7 +149,8 @@ async function offerActiveTab(): Promise<void> {
   const tabId = tab.id;
   $('tab-name').textContent = offer.name;
   $('tab-from').textContent = offer.local ? 'on this computer' : `from ${new URL(offer.url).host}`;
-  $('open-file').classList.remove('primary');
+  // On a text tab that is the one thing to do; the other ways in are for when no log is open.
+  document.querySelector<HTMLElement>('.popup-actions')!.hidden = true;
   $('this-tab').hidden = false;
   $('open-tab').addEventListener('click', () => void openTab(tabId, offer));
   $('tab-step-btn').addEventListener('click', () => {
