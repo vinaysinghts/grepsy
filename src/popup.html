@@ -24,16 +24,10 @@
     <button type="button" class="tool-btn primary" id="open-file">Open a log file</button>
     <button type="button" class="tool-btn" id="open-paste">Paste text</button>
   </div>
-  <form class="url-box" id="url-form" novalidate>
-    <label for="url" class="sr-only">Log link</label>
-    <input id="url" type="text" placeholder="Paste a log link" autocomplete="off" spellcheck="false">
-    <button class="tool-btn">Open</button>
-  </form>
-  <p class="popup-error" id="url-error" role="alert" hidden></p>
   <section aria-labelledby="recent-title">
     <h2 class="popup-label" id="recent-title">Recent</h2>
     <ul class="recent" id="recent"></ul>
-    <p class="muted popup-empty" id="recent-empty" hidden>Logs you open by link show up here.</p>
+    <p class="muted popup-empty" id="recent-empty" hidden>Logs you open from a tab or a link show up here.</p>
   </section>
   <section class="popup-auto" id="auto-open" aria-labelledby="auto-open-title">
     <div class="popup-auto-row">

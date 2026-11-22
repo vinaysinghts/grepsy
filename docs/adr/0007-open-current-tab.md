@@ -13,7 +13,7 @@ People often already have a log open in a tab: a local `.log` or `.txt` shown by
 - For local files Chrome blocks scripts until "Allow access to file URLs" is on, so the content type can't be read. There the offer falls back to log-like names (`.log`, `.log.N`, `.txt`, `.out`, `.err`, `.jsonl`, `.ndjson`).
 - **Open this file in Grepsy** replaces the tab with `viewer.html?src=<url>` (the back button returns to the plain view). The viewer downloads the file as for any link, so it still needs the site's optional host permission (ADR 5), or `file:///*` plus the file-access toggle for local files. The popup asks for that permission on the click; for local files with the toggle off, it shows the step and a button to the extension's settings first.
 - Chrome may close the popup while its permission prompt is up. The popup first writes the request to `chrome.storage.session`; the background script completes it on `permissions.onAdded` if the popup is gone (requests older than a minute are dropped).
-- The link box stays, below the main actions, for logs not yet open in a tab. It also feeds the Recent list.
+- The popup's link box is removed: pasting a link into the address bar and clicking the button does the same. Links a server only offers as a download (which never show in a tab) still open from the viewer's "Open a URL". Logs opened from a tab go through `?src=`, so they still land in Recent.
 
 ## Consequences
 

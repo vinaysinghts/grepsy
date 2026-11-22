@@ -92,13 +92,3 @@ export function viewerPath(open?: { src: string } | { paste: true }): string {
   return 'viewer.html?paste=1';
 }
 
-/**
- * What the user typed into the popup's link box, as a URL the viewer can
- * load, or null. A bare "example.com/app.log" is read as https.
- */
-export function parseUrlInput(text: string): string | null {
-  const t = text.trim();
-  if (!t) return null;
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
-  return isLoadableSource(withScheme) ? new URL(withScheme).href : null;
-}

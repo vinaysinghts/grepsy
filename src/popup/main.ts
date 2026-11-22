@@ -1,7 +1,6 @@
 import {
   forgetRecent,
   loadRecent,
-  parseUrlInput,
   recentSource,
   timeAgo,
   viewerPath,
@@ -27,9 +26,6 @@ setupTheme();
  * its content type; no tab access is held otherwise.
  */
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const urlForm = $<HTMLFormElement>('url-form');
-const urlInput = $<HTMLInputElement>('url');
-const urlError = $('url-error');
 const list = $<HTMLUListElement>('recent');
 const empty = $('recent-empty');
 
@@ -44,21 +40,6 @@ if (/Mac/i.test(navigator.platform)) {
 
 $('open-file').addEventListener('click', () => openViewer(viewerPath()));
 $('open-paste').addEventListener('click', () => openViewer(viewerPath({ paste: true })));
-
-urlForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const url = parseUrlInput(urlInput.value);
-  if (!url) {
-    urlError.textContent = 'Enter an http, https or file link.';
-    urlError.hidden = false;
-    urlInput.focus();
-    return;
-  }
-  openViewer(viewerPath({ src: url }));
-});
-urlInput.addEventListener('input', () => {
-  urlError.hidden = true;
-});
 
 function drawRecent(items: RecentLog[]): void {
   const now = Date.now();

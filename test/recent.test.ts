@@ -5,7 +5,6 @@ import {
   forgetRecent,
   loadRecent,
   parseRecent,
-  parseUrlInput,
   recentSource,
   rememberRecent,
   removeRecent,
@@ -99,24 +98,6 @@ describe('recent log labels', () => {
     expect(timeAgo(now - 3 * HOUR, now)).toBe('3h ago');
     expect(timeAgo(now - 2 * DAY, now)).toBe('2d ago');
     expect(timeAgo(now - 30 * DAY, now)).not.toMatch(/ago/);
-  });
-});
-
-describe('popup link box', () => {
-  it('accepts web and file links', () => {
-    expect(parseUrlInput('  https://x.dev/a.log ')).toBe('https://x.dev/a.log');
-    expect(parseUrlInput('file:///var/log/a.log')).toBe('file:///var/log/a.log');
-  });
-
-  it('reads a bare host and path as https', () => {
-    expect(parseUrlInput('x.dev/logs/a.log')).toBe('https://x.dev/logs/a.log');
-  });
-
-  it('rejects empty and unsupported links', () => {
-    expect(parseUrlInput('')).toBeNull();
-    expect(parseUrlInput('   ')).toBeNull();
-    expect(parseUrlInput('javascript:alert(1)')).toBeNull();
-    expect(parseUrlInput('ftp://x.dev/a.log')).toBeNull();
   });
 });
 

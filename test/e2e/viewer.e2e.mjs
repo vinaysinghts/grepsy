@@ -183,18 +183,12 @@ try {
   await popup.waitForSelector('.recent-name');
   assert.equal(await popup.textContent('.recent-name'), 'remote.log');
   assert.equal(await popup.textContent('.recent-from'), new URL(logUrl).host);
-  // A bad link is caught in the popup.
-  await popup.fill('#url', 'javascript:alert(1)');
-  await popup.press('#url', 'Enter');
-  await popup.waitForSelector('#url-error:not([hidden])');
-  // A link opens in the viewer.
+  assert.equal(await popup.locator('#url').count(), 0, 'no link box: links open from their tab');
+  await popup.close();
+  // A second link, opened in the viewer, joins the list.
   const otherUrl = logUrl.replace('remote.log', 'other.log');
-  await popup.fill('#url', otherUrl);
-  let tab = await viewerFrom(popup, (p) => p.press('#url', 'Enter'));
-  await tab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
-  assert.equal(await tab.textContent('#file-name'), 'other.log');
-  await tab.close();
-  if (!popup.isClosed()) await popup.close();
+  await page.goto(`chrome-extension://${id}/viewer.html?src=${encodeURIComponent(otherUrl)}`);
+  await page.waitForFunction(() => document.querySelector('#file-name')?.textContent === 'other.log');
 
   popup = await openPopup();
   await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 2);
@@ -202,7 +196,7 @@ try {
   await popup.locator('.recent li').nth(1).hover();
   await popup.locator('.recent-remove').nth(1).click();
   await popup.waitForFunction(() => document.querySelectorAll('.recent li').length === 1);
-  tab = await viewerFrom(popup, (p) => p.click('.recent-open'));
+  let tab = await viewerFrom(popup, (p) => p.click('.recent-open'));
   await tab.waitForFunction(() => document.querySelector('#file-name')?.textContent === 'other.log');
   await tab.close();
   if (!popup.isClosed()) await popup.close();
