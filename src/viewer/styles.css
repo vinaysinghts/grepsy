@@ -165,7 +165,9 @@ mark[class^='hl'] { color: inherit; border-radius: 2px; }
 
 .body { flex: 1; min-height: 0; display: flex; }
 .body .log { flex: 1; min-width: 0; }
-.rules { width: 230px; flex: none; border-left: 1px solid var(--border); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+/* Highlights drop down over the log, so the log keeps the full width. */
+.rules { position: absolute; right: 0; top: 34px; z-index: 5; width: 300px; max-height: min(420px, 70vh); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; background: var(--popover); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px var(--shadow); }
+.rules[hidden] { display: none; }
 .rules ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
 .rules li:hover { background: var(--raised); }

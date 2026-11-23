@@ -65,7 +65,17 @@
       </div>
       <div class="levels" id="levels"></div>
       <span class="grow"></span>
-      <button type="button" class="tool-btn" id="rules-toggle" aria-pressed="false" aria-controls="rules-panel">Highlights</button>
+      <div class="menu-wrap">
+        <button type="button" class="tool-btn" id="rules-toggle" aria-expanded="false" aria-controls="rules-panel">Highlights</button>
+        <div class="rules dropdown" id="rules-panel" hidden aria-label="Highlights and saved searches">
+          <ul id="rules-list"></ul>
+          <form id="rule-form" class="rule-form">
+            <label for="rule-input" class="sr-only">Text to highlight</label>
+            <input id="rule-input" placeholder="+ Add highlight" autocomplete="off" spellcheck="false" maxlength="200">
+          </form>
+          <p class="muted rules-note">Saved terms are highlighted in every log. <b>Filter</b> shows only the lines that match one.</p>
+        </div>
+      </div>
       <button type="button" class="tool-btn icon" data-theme-toggle><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg></button>
       <div class="menu-wrap">
         <button type="button" class="tool-btn icon" id="help-toggle" aria-expanded="false" aria-controls="help-menu" aria-label="Help and feedback">?</button>
@@ -84,14 +94,6 @@
         <div class="spacer" id="spacer"></div>
         <div class="rows" id="rows"></div>
       </div>
-      <aside class="rules" id="rules-panel" hidden aria-label="Highlight rules">
-        <ul id="rules-list"></ul>
-        <form id="rule-form" class="rule-form">
-          <label for="rule-input" class="sr-only">Text to highlight</label>
-          <input id="rule-input" placeholder="+ Add highlight" autocomplete="off" spellcheck="false" maxlength="200">
-        </form>
-        <p class="muted rules-note">Saved terms are highlighted in every log. <b>Filter</b> shows only the lines that match one.</p>
-      </aside>
     </div>
     <footer class="status">
       <span id="status"></span>

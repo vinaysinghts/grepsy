@@ -84,8 +84,11 @@ try {
   await page.click('.rule-filter');
   assert.equal(await page.inputValue('#q'), 'timeout');
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '3 matches');
-  await page.click('.rule-remove');
+  assert.equal(await page.isHidden('#rules-panel'), true, 'the dropdown closes to show the results');
   await page.click('#rules-toggle');
+  await page.click('.rule-remove');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isHidden('#rules-panel'), true);
 
   await page.click('#filter');
   await page.fill('#q', '');
@@ -124,6 +127,8 @@ try {
   await page.click('#rules-toggle');
   await page.click('.rule-remove');
   await page.waitForFunction(() => !document.querySelector('mark.hl0'));
+  await page.click('#log');
+  assert.equal(await page.isHidden('#rules-panel'), true, 'a click on the log closes the dropdown');
 
   // Help menu: bug links carry the version and browser, never log content.
   await page.click('#help-toggle');

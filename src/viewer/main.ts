@@ -523,7 +523,10 @@ function drawRules(): void {
       filterBtnEl.className = 'rule-filter';
       filterBtnEl.textContent = 'Filter';
       filterBtnEl.title = `Show only lines matching ${r.term}`;
-      filterBtnEl.addEventListener('click', () => applySearch(r.term, r.regex === true));
+      filterBtnEl.addEventListener('click', () => {
+        setRulesOpen(false);
+        applySearch(r.term, r.regex === true);
+      });
       if (r.regex) {
         const re = document.createElement('span');
         re.className = 'rule-re';
@@ -542,12 +545,24 @@ function drawRules(): void {
 ruleStore.onChange(drawRules);
 void ruleStore.load();
 
-rulesToggle.addEventListener('click', () => {
-  const open = rulesPanel.hidden;
+function setRulesOpen(open: boolean): void {
   rulesPanel.hidden = !open;
-  rulesToggle.setAttribute('aria-pressed', String(open));
+  rulesToggle.setAttribute('aria-expanded', String(open));
   if (open) ruleInput.focus();
-  render();
+}
+rulesToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setRulesOpen(rulesPanel.hidden);
+});
+// Closes on a click elsewhere or Escape, like the help menu.
+document.addEventListener('click', (e) => {
+  if (!rulesPanel.hidden && !rulesPanel.contains(e.target as Node)) setRulesOpen(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !rulesPanel.hidden) {
+    setRulesOpen(false);
+    rulesToggle.focus();
+  }
 });
 ruleForm.addEventListener('submit', (e) => {
   e.preventDefault();
