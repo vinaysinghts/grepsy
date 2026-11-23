@@ -350,11 +350,11 @@ try {
   await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn off');
   assert.match(await popup.textContent('#auto-open-title'), /Always open \.log files/);
   assert.match(await popup.textContent('#auto-open-status'), /^On\./);
-  // Web .log links are a separate opt-in (it needs access to every site).
-  await popup.waitForFunction(() => document.querySelector('#auto-open-web-status')?.textContent.startsWith('Off.'));
-  assert.equal(await popup.textContent('#auto-open-web-btn'), 'Turn on');
+  // The same switch covers websites, after one Allow click (all-sites access isn't asked at install).
+  await popup.waitForSelector('#auto-open-web:not([hidden])');
   await popup.click('#auto-open-btn');
   await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  await popup.waitForSelector('#auto-open-web', { state: 'hidden' });
   assert.equal(await popup.isHidden('#file-access-step'), true);
   await popup.close();
 

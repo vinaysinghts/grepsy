@@ -26,7 +26,7 @@ export function shouldAutoOpenWeb(url: string): boolean {
   return (u.protocol === 'https:' || u.protocol === 'http:') && LOG_NAME.test(decodeURIComponent(u.pathname));
 }
 
-/** Web origins "open .log links on websites" needs: every site, asked for only when the user turns it on. */
+/** Web origins auto-open needs for .log links on websites: every site, asked for with one click in the popup. */
 export const WEB_ORIGINS = ['https://*/*', 'http://*/*'];
 
 /**
@@ -82,7 +82,7 @@ export interface AutoOpenView {
  */
 export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
   if (!f.wanted) {
-    return { on: false, button: 'Turn on', status: 'Off. Local .log files open as plain text.', showStep: false };
+    return { on: false, button: 'Turn on', status: 'Off. .log files open as plain text.', showStep: false };
   }
   if (!f.fileAccess) {
     return {
@@ -95,7 +95,7 @@ export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
   if (!f.hasPermission) {
     return { on: false, button: 'Allow', status: 'Grepsy needs your OK to read local files.', showStep: false };
   }
-  return { on: true, button: 'Turn off', status: 'On. Local .log files you open in Chrome open in Grepsy.', showStep: false };
+  return { on: true, button: 'Turn off', status: 'On. .log files you open in Chrome open in Grepsy.', showStep: false };
 }
 
 /** The saved setting: auto-open is on unless the user turned it off. */

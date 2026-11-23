@@ -33,7 +33,7 @@
     <div class="popup-auto-row">
       <div>
         <h2 class="popup-auto-title" id="auto-open-title">Always open .log files in Grepsy</h2>
-        <p class="muted" id="auto-open-status">Local .log files you open in Chrome open in Grepsy.</p>
+        <p class="muted" id="auto-open-status">.log files you open in Chrome open in Grepsy.</p>
       </div>
       <button type="button" class="tool-btn" id="auto-open-btn">Turn on</button>
     </div>
@@ -41,12 +41,9 @@
       <p>On Grepsy's details page, turn on <b>Allow access to file URLs</b>. Then open Grepsy again and click Turn on.</p>
       <button type="button" class="tool-btn" id="file-access-btn">Open extension settings</button>
     </div>
-    <div class="popup-auto-row popup-auto-sub">
-      <div>
-        <h3 class="popup-auto-title" id="auto-open-web-title">Also .log links on websites</h3>
-        <p class="muted" id="auto-open-web-status">Off.</p>
-      </div>
-      <button type="button" class="tool-btn" id="auto-open-web-btn">Turn on</button>
+    <div class="this-tab-step" id="auto-open-web" hidden>
+      <p>For <b>.log links on websites</b> too, let Grepsy check pages you open. Chrome asks once.</p>
+      <button type="button" class="tool-btn" id="auto-open-web-btn">Allow websites</button>
     </div>
   </section>
   <footer class="popup-foot muted">

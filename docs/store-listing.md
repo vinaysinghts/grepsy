@@ -49,7 +49,7 @@ View, search and filter log files locally in the browser.
 - **activeTab:** when the user clicks the Grepsy icon, lets the popup read the current tab's URL so it can offer to open a plain text log from that tab in the viewer.
 - **scripting:** with activeTab only, runs a one-line check (`document.contentType`) in the current tab after the icon is clicked, so the offer appears only for plain text files and never on web pages. No other code is injected and nothing is read from the page.
 - **Host permission file:///*:** sends local .log files the user opens in Chrome to the viewer (on by default, can be turned off in the popup) and lets the viewer read them. It only takes effect once the user turns on "Allow access to file URLs".
-- **Optional host permissions http://*/*, https://*/*:** requested only when the user opens a log from a URL (for that one site), or for all sites if the user turns on "Also .log links on websites", so plain text .log links open in the viewer. Pages are only taken over when Chrome reports them as plain text.
+- **Optional host permissions http://*/*, https://*/*:** requested only when the user opens a log from a URL (for that one site), or for all sites when the user clicks "Allow websites" under the auto-open switch, so plain text .log links on websites open in the viewer. Pages are only taken over when Chrome reports them as plain text.
 - **Remote code:** none.
 
 ## Data usage disclosures

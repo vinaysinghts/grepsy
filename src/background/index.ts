@@ -1,5 +1,5 @@
-import { WEB_ORIGINS, autoOpenWanted, isReturnVisit, shouldAutoOpen, shouldAutoOpenWeb } from '../core/autoOpen';
-import { PENDING_TTL_MS, isPlainText, pendingToRun } from '../core/currentTab';
+import { autoOpenWanted, isReturnVisit, shouldAutoOpen, shouldAutoOpenWeb } from '../core/autoOpen';
+import { isPlainText, pendingToRun } from '../core/currentTab';
 import { viewerPath } from '../core/recent';
 
 const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
@@ -11,9 +11,10 @@ const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
 // is sent to the viewer. Chrome only reveals file:// tab URLs here once the
 // user has turned on "Allow access to file URLs" for Grepsy.
 //
-// Optional, off by default: .log links on websites too ("autoOpenWeb", which
-// needs access to all sites). A web page is only taken over once it has
-// loaded and Chrome says it is plain text, so HTML pages never are.
+// The same setting covers .log links on websites, once the user has allowed
+// Grepsy to see web tabs (one click in the popup). A web page is only taken
+// over once it has loaded and Chrome says it is plain text, so HTML pages
+// never are.
 //
 // Each tab remembers the last URL it left for the viewer, so Back from the
 // viewer lands on the log instead of bouncing straight back.
@@ -48,8 +49,8 @@ chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
   }
   const loaded = info.status === 'complete' ? tab.url : undefined;
   if (loaded && shouldAutoOpenWeb(loaded)) {
-    void chrome.storage.local.get('autoOpenWeb').then(async ({ autoOpenWeb }) => {
-      if (autoOpenWeb !== true || !(await isPlainTextTab(tabId))) return;
+    void chrome.storage.local.get('autoOpen').then(async ({ autoOpen }) => {
+      if (!autoOpenWanted(autoOpen) || !(await isPlainTextTab(tabId))) return;
       await sendToViewer(tabId, loaded);
     });
   }
@@ -61,14 +62,6 @@ chrome.tabs.onRemoved.addListener((tabId) => void chrome.storage.session.remove(
 // up, so the popup leaves the request in session storage and this finishes
 // it once the permission is granted.
 chrome.permissions.onAdded.addListener(() => {
-  // "Also .log links on websites" asked for every site from the popup, which
-  // Chrome may have closed during its prompt.
-  void chrome.storage.session.get('pendingAutoOpenWeb').then(async ({ pendingAutoOpenWeb }) => {
-    if (typeof pendingAutoOpenWeb !== 'number' || Date.now() - pendingAutoOpenWeb > PENDING_TTL_MS) return;
-    if (!(await chrome.permissions.contains({ origins: WEB_ORIGINS }))) return;
-    await chrome.storage.session.remove('pendingAutoOpenWeb');
-    await chrome.storage.local.set({ autoOpenWeb: true });
-  });
   void chrome.storage.session.get('pendingOpen').then(async ({ pendingOpen }) => {
     const run = pendingToRun(pendingOpen, Date.now());
     if (!run || !(await chrome.permissions.contains({ origins: [run.origin] }))) return;

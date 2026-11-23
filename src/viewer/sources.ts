@@ -85,41 +85,29 @@ export async function setupAutoOpen(): Promise<void> {
 }
 
 /**
- * "Also .log links on websites": off by default because it needs access to
- * every site, which Chrome shows as a strong warning. Asked for on the click.
+ * The websites half of auto-open. It shares the one auto-open setting, but
+ * seeing web tab URLs needs access to every site, which Chrome shows as a
+ * strong warning; so it is asked for with one click here, not at install.
  */
 export async function setupAutoOpenWeb(): Promise<void> {
-  const btn = document.getElementById('auto-open-web-btn') as HTMLButtonElement | null;
-  const status = document.getElementById('auto-open-web-status');
-  if (!btn || !status || !chrome.permissions || !chrome.storage) return;
+  const row = document.getElementById('auto-open-web');
+  const btn = document.getElementById('auto-open-web-btn');
+  if (!row || !btn || !chrome.permissions || !chrome.storage) return;
   const refresh = async () => {
-    const { autoOpenWeb } = await chrome.storage.local.get('autoOpenWeb');
-    const on = autoOpenWeb === true && (await chrome.permissions.contains({ origins: WEB_ORIGINS }));
-    btn.textContent = on ? 'Turn off' : 'Turn on';
-    btn.setAttribute('aria-pressed', String(on));
-    status.textContent = on
-      ? 'On. Plain text .log links on websites open in Grepsy.'
-      : 'Off. Needs access to read pages on all sites, asked for when you turn it on.';
+    const { autoOpen } = await chrome.storage.local.get('autoOpen');
+    const granted = await chrome.permissions.contains({ origins: WEB_ORIGINS });
+    row.hidden = !autoOpenWanted(autoOpen) || granted;
   };
   btn.addEventListener('click', async () => {
-    if (btn.getAttribute('aria-pressed') === 'true') {
-      await chrome.storage.local.set({ autoOpenWeb: false });
-      await chrome.permissions.remove({ origins: WEB_ORIGINS }).catch(() => false);
-    } else {
-      // Chrome may close the popup during its prompt; the background script
-      // then finishes turning this on.
-      await chrome.storage.session.set({ pendingAutoOpenWeb: Date.now() });
-      try {
-        const granted = await chrome.permissions.request({ origins: WEB_ORIGINS });
-        await chrome.storage.session.remove('pendingAutoOpenWeb');
-        if (granted) await chrome.storage.local.set({ autoOpenWeb: true });
-      } catch (err) {
-        await chrome.storage.session.remove('pendingAutoOpenWeb');
-        status.textContent = `Could not ask for access: ${err instanceof Error ? err.message : String(err)}`;
-        return;
-      }
+    try {
+      await chrome.permissions.request({ origins: WEB_ORIGINS });
+    } catch {
+      // Refused or unavailable: the row stays, so the user can try again.
     }
     await refresh();
+  });
+  chrome.storage.onChanged.addListener((changes) => {
+    if ('autoOpen' in changes) void refresh();
   });
   await refresh();
 }
