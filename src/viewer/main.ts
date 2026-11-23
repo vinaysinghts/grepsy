@@ -8,6 +8,7 @@ import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
+import { fileNameFromUrl } from '../core/autoOpen';
 import { rememberRecent } from '../core/recent';
 import { NetworkFailure, fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
@@ -58,8 +59,25 @@ const state = {
 
 // ---- Opening a file ------------------------------------------------------
 
+const loading = $('loading');
+const loadingBar = $('loading-bar');
+/** Swaps the start screen for the loading mark while a log downloads or is read. */
+function showLoading(title: string, detail = ''): void {
+  startScreen.hidden = true;
+  loading.hidden = false;
+  $('loading-title').textContent = title;
+  $('loading-detail').textContent = detail;
+  loadingBar.style.width = '0';
+}
+/** Back to the start screen, e.g. after a failed download (its message is in #progress). */
+function showStart(): void {
+  loading.hidden = true;
+  startScreen.hidden = false;
+}
+
 function open(file: File): void {
   progress.textContent = `Reading ${file.name}…`;
+  showLoading(`Opening ${file.name}`);
   fileName.textContent = file.name;
   fileName.title = file.name;
   document.title = `${file.name} · Grepsy`;
@@ -114,11 +132,13 @@ const urlInput = $<HTMLInputElement>('url-input');
 async function openUrl(url: string, askForAccess: boolean): Promise<'ok' | 'network' | 'failed'> {
   progress.classList.remove('error');
   progress.textContent = `Downloading ${url}…`;
+  showLoading(`Downloading ${fileNameFromUrl(url)}`, new URL(url).protocol === 'file:' ? 'from this computer' : `from ${new URL(url).host}`);
   try {
     open(await fetchAsFile(url, askForAccess));
     void rememberRecent(chrome.storage.local, url);
     return 'ok';
   } catch (err) {
+    showStart();
     progress.classList.add('error');
     progress.textContent = (err as Error).message;
     return err instanceof NetworkFailure ? 'network' : 'failed';
@@ -149,6 +169,7 @@ if (src) {
     progress.textContent = `Click Open to let Grepsy read from ${new URL(src).host}.`;
   });
 }
+if (!src) startScreen.hidden = false;
 if (params.has('paste')) $('paste-btn').click();
 void setupAutoOpen();
 
@@ -160,6 +181,8 @@ worker.onmessage = (e: MessageEvent<Response>) => {
     case 'progress': {
       const pct = m.totalBytes ? Math.min(99, Math.round((m.bytes / m.totalBytes) * 100)) : 0;
       progress.textContent = `Reading… ${m.lines.toLocaleString()} lines (${pct}%)`;
+      loadingBar.style.width = `${pct}%`;
+      $('loading-detail').textContent = `${m.lines.toLocaleString()} lines · ${pct}%`;
       break;
     }
     case 'loaded':
@@ -167,6 +190,7 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       state.loadMs = m.ms;
       buildLevelButtons(m.counts);
       startScreen.hidden = true;
+      loading.hidden = true;
       viewer.hidden = false;
       requestView();
       log.focus();

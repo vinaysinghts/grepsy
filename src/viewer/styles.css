@@ -228,3 +228,17 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .rule-filter { padding: 0 6px; height: 20px; background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }
 .rule-filter:hover { color: var(--text-strong); border-color: var(--accent); }
 .rule-re { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+/* Loading: the Grepsy mark, its lens sweeping the lines. */
+.loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--bg); }
+.loading[hidden] { display: none; }
+.loading-mark .ln { stroke: var(--accent); stroke-width: 11; opacity: 0.35; animation: grepsy-line 1.2s ease-in-out infinite; }
+.loading-mark .ln2 { animation-delay: 0.2s; }
+.loading-mark .ln3 { animation-delay: 0.4s; }
+.loading-mark .lens { stroke: var(--accent); animation: grepsy-lens 1.2s ease-in-out infinite alternate; }
+@keyframes grepsy-line { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes grepsy-lens { from { transform: translate(-48px, -50px); } to { transform: translate(0, 0); } }
+@media (prefers-reduced-motion: reduce) { .loading-mark .ln, .loading-mark .lens { animation: none; opacity: 1; } }
+.loading-title { margin: 6px 0 0; font-family: var(--mono); font-size: 13px; color: var(--text-strong); max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loading-bar { width: 220px; height: 3px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.loading-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+.loading-detail { margin: 0; font-size: 11px; min-height: 1em; }
