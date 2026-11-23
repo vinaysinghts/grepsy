@@ -27,11 +27,12 @@ describe('compileQuery', () => {
     expect(compileQuery({ ...opts, regex: true, text: '(' }).kind).toBe('error');
   });
 
-  it('ignores surrounding whitespace in a plain search', () => {
-    const q = compileQuery({ ...opts, text: '  steps  ' });
+  it('keeps spaces in a plain search, so a leading space means "starts a word"', () => {
+    const q = compileQuery({ ...opts, text: ' steps' });
     if (q.kind !== 'ok') throw new Error('expected ok');
-    expect(q.test.test('ran in 3 steps')).toBe(true);
-    expect(q.test.test('   steps indented')).toBe(true);
+    expect(q.test.test('Test Steps:')).toBe(true);
+    expect(q.test.test('diagnosticSteps = []')).toBe(false);
+    expect(q.highlight.exec('Test Steps:')?.[0]).toBe(' Steps');
     expect(compileQuery({ ...opts, text: '   ' }).kind).toBe('empty');
   });
 

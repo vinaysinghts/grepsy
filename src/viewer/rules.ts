@@ -38,8 +38,9 @@ export class RuleStore {
   }
 
   add(term: string, regex = false): boolean {
-    const t = term.trim();
-    if (!t || this.rules.length >= MAX_RULES) return false;
+    // Kept exactly as typed: a leading space is meaningful (" steps" ≠ "steps").
+    const t = term;
+    if (!t.trim() || this.rules.length >= MAX_RULES) return false;
     if (regex && compileQuery({ text: t, caseSensitive: false, regex: true }).kind !== 'ok') return false;
     if (this.rules.some((r) => r.term.toLowerCase() === t.toLowerCase() && !!r.regex === regex)) return false;
     const used = new Set(this.rules.map((r) => r.color));

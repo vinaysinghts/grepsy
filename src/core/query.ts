@@ -18,13 +18,12 @@ function escapeRegExp(s: string): string {
  * a global one for finding every match to highlight. Plain text is matched
  * literally; an invalid regex is reported instead of throwing.
  *
- * Plain-text searches ignore surrounding whitespace, so a stray leading or
- * trailing space doesn't quietly skip matches. Use regex mode (e.g. `^\s` or
- * ` x`) to match spaces exactly.
+ * Spaces are part of the search, exactly as typed: " steps" finds "Test Steps"
+ * but not "diagnosticSteps". Only an all-space search counts as empty.
  */
 export function compileQuery(o: QueryOptions): CompiledQuery {
-  const text = o.regex ? o.text : o.text.trim();
-  if (text === '') return { kind: 'empty' };
+  if (o.text.trim() === '') return { kind: 'empty' };
+  const text = o.text;
   const source = o.regex ? text : escapeRegExp(text);
   const flags = o.caseSensitive ? '' : 'i';
   try {

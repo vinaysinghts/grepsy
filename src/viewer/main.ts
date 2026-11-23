@@ -203,7 +203,7 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       state.requested = '';
       searchBox.classList.toggle('invalid', m.error !== null);
       searchBox.title = m.error ?? '';
-      matchCount.textContent = state.query.text && !m.error ? `${m.matches.toLocaleString()} matches` : '';
+      matchCount.textContent = state.query.text && !m.error ? `${m.matches.toLocaleString()} ${m.matches === 1 ? "match" : "matches"}` : '';
       bookmarkStatus.textContent = m.bookmarks ? `${m.bookmarks} bookmarked` : '';
       $('bookmark-nav').hidden = m.bookmarks === 0;
       status.textContent =

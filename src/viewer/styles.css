@@ -172,7 +172,7 @@ mark[class^='hl'] { color: inherit; border-radius: 2px; }
 .rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
 .rules li:hover { background: var(--raised); }
 .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.rule-term { flex: 1; min-width: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-term { flex: 1; min-width: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; }
 .rule-remove { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
 .rule-remove:hover { color: var(--text-strong); background: var(--border); }
 .rule-form input { width: 100%; height: 26px; padding: 0 6px; background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
