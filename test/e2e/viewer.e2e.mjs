@@ -121,6 +121,20 @@ try {
   await page.press('#rule-input', 'Enter');
   await page.waitForSelector('mark.hl0', { state: 'attached' });
   assert.equal(await page.textContent('#rules-toggle'), 'Highlights 1');
+  // Saved terms edit in place, and the color dot cycles colors.
+  await page.click('.rule-term');
+  await page.fill('.rule-edit', 'user_id=56');
+  await page.press('.rule-edit', 'Enter');
+  await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=56');
+  await page.click('.rule-term');
+  await page.fill('.rule-edit', 'user_id=42');
+  await page.press('.rule-edit', 'Enter');
+  await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=42');
+  await page.click('.rules .swatch');
+  await page.waitForSelector('.rules .swatch.hl1');
+  await page.click('.rules .swatch');
+  for (let i = 0; i < 4; i++) await page.click('.rules .swatch');
+  await page.waitForSelector('.rules .swatch.hl0');
   await page.reload();
   await page.setInputFiles('#file', sample);
   await page.waitForSelector('mark.hl0', { state: 'attached' });
@@ -341,7 +355,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('43 rows'));
   await page.locator('.row .fold').first().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('23 rows'));
-  await page.click('.gap-act:has-text("show all")');
+  // The › arrow (like the rest of the row) shows all.
+  await page.click('.gap.big .fold');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('200 rows'));
 
   // Auto-open is on by default (this test browser already allows file access,

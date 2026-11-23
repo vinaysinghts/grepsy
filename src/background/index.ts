@@ -1,6 +1,7 @@
 import { autoOpenWanted, isReturnVisit, shouldAutoOpen, shouldAutoOpenWeb } from '../core/autoOpen';
 import { isPlainText, pendingToRun } from '../core/currentTab';
 import { viewerPath } from '../core/recent';
+import { VIEW_KEY_PREFIX, viewsToRestore } from '../core/restore';
 
 const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
 
@@ -67,5 +68,19 @@ chrome.permissions.onAdded.addListener(() => {
     if (!run || !(await chrome.permissions.contains({ origins: [run.origin] }))) return;
     await chrome.storage.session.remove('pendingOpen');
     await chrome.tabs.update(run.tabId, { url: viewerUrl(run.url) });
+  });
+});
+
+// Chrome closes Grepsy's tabs when the extension reloads or updates. Reopen
+// the logs that were open by link, as their original pages: auto-open then
+// brings them back into Grepsy if it is on, and they stay as plain text if not.
+// (Files picked from disk or pasted can't be reopened without the user.)
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason !== 'update') return;
+  void chrome.storage.local.get(null).then(async (items) => {
+    const stale = Object.keys(items).filter((k) => k.startsWith(VIEW_KEY_PREFIX));
+    const reopen = viewsToRestore(items, Date.now());
+    await chrome.storage.local.remove(stale);
+    for (const url of reopen) await chrome.tabs.create({ url, active: false });
   });
 });

@@ -171,8 +171,11 @@ mark[class^='hl'] { color: inherit; border-radius: 2px; }
 .rules ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
 .rules li:hover { background: var(--raised); }
-.swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.rule-term { flex: 1; min-width: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; }
+.swatch { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; }
+.swatch:hover { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+.rule-term { flex: 1; min-width: 0; padding: 0; background: none; border: 0; color: inherit; text-align: left; font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; cursor: text; }
+.rule-term:hover { text-decoration: underline dotted var(--muted); }
+.rule-edit { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
 .rule-remove { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
 .rule-remove:hover { color: var(--text-strong); background: var(--border); }
 .rule-form input { width: 100%; height: 26px; padding: 0 6px; background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
@@ -222,7 +225,7 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .bm-nav[hidden] { display: none; }
 .bm-nav .link-btn { font-size: 14px; line-height: 1; }
 /* Big gaps: show a few lines from either end, or all. */
-.gap.big { cursor: default; }
+.gap.big { cursor: pointer; }
 .gap.big .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
 .gap.big .gap-act:hover { color: var(--accent); background: var(--raised); }
 .rule-filter { padding: 0 6px; height: 20px; background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }

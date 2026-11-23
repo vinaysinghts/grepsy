@@ -10,6 +10,7 @@ import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
 import { fileNameFromUrl } from '../core/autoOpen';
 import { rememberRecent } from '../core/recent';
+import { VIEW_HEARTBEAT_MS, VIEW_KEY_PREFIX } from '../core/restore';
 import { NetworkFailure, fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
 
@@ -124,6 +125,20 @@ $('home').addEventListener('click', () => {
   location.href = 'viewer.html';
 });
 
+// Chrome closes this tab if Grepsy reloads or updates; a fresh note lets the
+// background script reopen the log afterwards (see core/restore.ts).
+const noteKey = `${VIEW_KEY_PREFIX}${crypto.randomUUID()}`;
+let noteTimer = 0;
+function keepOpenNote(src: string): void {
+  const write = () => void chrome.storage.local.set({ [noteKey]: { src, seen: Date.now() } });
+  write();
+  clearInterval(noteTimer);
+  noteTimer = window.setInterval(write, VIEW_HEARTBEAT_MS);
+}
+// Not removed on pagehide: Chrome fires it when it closes the tab for an
+// update too, which is exactly when the note is needed. A closed tab's note
+// simply goes stale.
+
 // Opening by URL: the "Open a URL" box, or ?src= when the background
 // script redirected a file:// log tab here.
 const urlBox = $<HTMLFormElement>('url-box');
@@ -136,6 +151,7 @@ async function openUrl(url: string, askForAccess: boolean): Promise<'ok' | 'netw
   try {
     open(await fetchAsFile(url, askForAccess));
     void rememberRecent(chrome.storage.local, url);
+    keepOpenNote(url);
     return 'ok';
   } catch (err) {
     showStart();
@@ -385,9 +401,15 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     b.className = 'gap-act';
     b.textContent = text;
     b.title = title;
-    b.addEventListener('click', () => expand(start, end));
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expand(start, end);
+    });
     return b;
   };
+  // Anywhere else on the row (the › arrow, the text) shows all, as on small gaps.
+  div.title = `Show all ${n.toLocaleString()} lines`;
+  div.addEventListener('click', () => expand(row.start, row.end));
   div.append(
     fold,
     g,
@@ -530,12 +552,19 @@ function drawRules(): void {
   rulesList.replaceChildren(
     ...ruleStore.rules.map((r, i) => {
       const li = document.createElement('li');
-      const sw = document.createElement('span');
+      // The color dot cycles colors; the term edits in place on click.
+      const sw = document.createElement('button');
+      sw.type = 'button';
       sw.className = `swatch hl${r.color}`;
-      const term = document.createElement('span');
+      sw.title = 'Change color';
+      sw.setAttribute('aria-label', `Change color of ${r.term}`);
+      sw.addEventListener('click', () => ruleStore.nextColor(i));
+      const term = document.createElement('button');
+      term.type = 'button';
       term.className = 'rule-term';
       term.textContent = r.term;
-      term.title = r.term;
+      term.title = 'Click to edit';
+      term.addEventListener('click', () => editRule(i, term));
       const rm = document.createElement('button');
       rm.type = 'button';
       rm.className = 'rule-remove';
@@ -566,6 +595,35 @@ function drawRules(): void {
   render();
 }
 
+/** Swaps a saved term for a text box; Enter or leaving it saves, Escape cancels. */
+function editRule(index: number, term: HTMLElement): void {
+  const rule = ruleStore.rules[index];
+  if (!rule) return;
+  const input = document.createElement('input');
+  input.className = 'rule-edit';
+  input.value = rule.term;
+  input.setAttribute('aria-label', 'Edit highlight');
+  input.spellcheck = false;
+  let done = false;
+  const finish = (save: boolean) => {
+    if (done) return;
+    done = true;
+    if (save && input.value !== rule.term && ruleStore.edit(index, input.value)) return; // redrawn by onChange
+    drawRules();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish(true);
+    else if (e.key === 'Escape') {
+      e.stopPropagation(); // keep the dropdown open
+      finish(false);
+    }
+  });
+  input.addEventListener('blur', () => finish(true));
+  term.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
 ruleStore.onChange(drawRules);
 void ruleStore.load();
 
@@ -580,7 +638,8 @@ rulesToggle.addEventListener('click', (e) => {
 });
 // Closes on a click elsewhere or Escape, like the help menu.
 document.addEventListener('click', (e) => {
-  if (!rulesPanel.hidden && !rulesPanel.contains(e.target as Node)) setRulesOpen(false);
+  // composedPath, not contains: a click can replace its own target (editing a term).
+  if (!rulesPanel.hidden && !e.composedPath().includes(rulesPanel)) setRulesOpen(false);
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !rulesPanel.hidden) {

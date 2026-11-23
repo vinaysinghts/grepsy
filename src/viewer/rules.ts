@@ -52,6 +52,28 @@ export class RuleStore {
     return true;
   }
 
+  /** Changes a saved term's text. Refuses empty, duplicate or (for regex terms) invalid text. */
+  edit(index: number, term: string): boolean {
+    const rule = this.rules[index];
+    if (!rule || !term.trim()) return false;
+    const regex = rule.regex === true;
+    if (regex && compileQuery({ text: term, caseSensitive: false, regex: true }).kind !== 'ok') return false;
+    const clash = this.rules.some(
+      (r, i) => i !== index && r.term.toLowerCase() === term.toLowerCase() && !!r.regex === regex,
+    );
+    if (clash) return false;
+    this.rules = this.rules.map((r, i) => (i === index ? { ...r, term } : r));
+    this.save();
+    return true;
+  }
+
+  /** Moves a saved term to the next highlight color. */
+  nextColor(index: number): void {
+    if (!this.rules[index]) return;
+    this.rules = this.rules.map((r, i) => (i === index ? { ...r, color: (r.color + 1) % COLOR_COUNT } : r));
+    this.save();
+  }
+
   remove(index: number): void {
     this.rules = this.rules.filter((_, i) => i !== index);
     this.save();
