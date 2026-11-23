@@ -10,8 +10,10 @@ const viewerUrl = (src: string) => chrome.runtime.getURL(viewerPath({ src }));
 // Auto-open (on unless the user turned it off): a tab that opens a local log
 // is sent to the viewer. Chrome only reveals file:// tab URLs here once the
 // user has turned on "Allow access to file URLs" for Grepsy.
-chrome.tabs.onUpdated.addListener((tabId, info) => {
-  const url = info.url;
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  // info.url is only set when the URL changes; a reload or a file opened from
+  // the desktop into a new tab may only report status, so fall back to tab.url.
+  const url = info.url ?? (info.status === 'loading' ? tab.url : undefined);
   if (!url || !shouldAutoOpen(url)) return;
   void chrome.storage.local.get('autoOpen').then(({ autoOpen }) => {
     if (autoOpenWanted(autoOpen)) void chrome.tabs.update(tabId, { url: viewerUrl(url) });
