@@ -124,6 +124,25 @@ function getRows(id: number, start: number, count: number): void {
   post({ type: 'rows', id, start, rows: out });
 }
 
+/** The lines on show, as a text file. Built in chunks so a huge view never needs one giant string. */
+function exportShown(id: number): void {
+  const parts: string[] = [];
+  let chunk: string[] = [];
+  let lines = 0;
+  for (let r = 0; r < rows.length; r++) {
+    const v = rows[r]!;
+    if (isGap(v)) continue;
+    chunk.push(store.text(v));
+    lines++;
+    if (chunk.length === 10_000) {
+      parts.push(chunk.join('\n') + '\n');
+      chunk = [];
+    }
+  }
+  if (chunk.length) parts.push(chunk.join('\n') + '\n');
+  post({ type: 'export', id, blob: new Blob(parts, { type: 'text/plain' }), lines });
+}
+
 /** An error line that starts an entry, not a stack frame continuing the one above. */
 function isErrorStart(line: number): boolean {
   if (store.level(line) !== 1) return false;
@@ -177,6 +196,9 @@ self.onmessage = (e: MessageEvent<Request>) => {
       break;
     case 'rows':
       getRows(m.id, m.start, m.count);
+      break;
+    case 'export':
+      exportShown(m.id);
       break;
     case 'find':
       find(m.id, m.fromRow, m.direction, m.target);

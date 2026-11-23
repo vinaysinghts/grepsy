@@ -2,6 +2,7 @@ import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
 import { extractJson, mayContainJson } from '../core/json';
 import { LEVEL_COUNT } from '../core/lineStore';
+import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
@@ -52,7 +53,7 @@ const state = {
   requested: '',
   current: -1,
   highlight: null as RegExp | null,
-  query: { text: '', caseSensitive: false, regex: false, filter: false, context: 0, levels: [] } as ViewQuery,
+  query: { text: '', caseSensitive: false, regex: false, filter: true, context: 0, levels: [] } as ViewQuery,
 };
 
 // ---- Opening a file ------------------------------------------------------
@@ -180,6 +181,7 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       searchBox.title = m.error ?? '';
       matchCount.textContent = state.query.text && !m.error ? `${m.matches.toLocaleString()} matches` : '';
       bookmarkStatus.textContent = m.bookmarks ? `${m.bookmarks} bookmarked` : '';
+      $('bookmark-nav').hidden = m.bookmarks === 0;
       status.textContent =
         `${m.rowCount.toLocaleString()} rows · ${state.lines.toLocaleString()} lines · read in ${state.loadMs.toLocaleString()} ms`;
       render();
@@ -188,6 +190,9 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       if (m.id !== state.viewId) return;
       m.rows.forEach((r, i) => state.cache.set(m.start + i, r));
       render();
+      break;
+    case 'export':
+      void finishExport(m.blob, m.lines);
       break;
     case 'found':
       if (m.id !== state.viewId || m.row === null) return;
@@ -315,11 +320,15 @@ function patterns(): Pattern[] {
   return list.concat(ruleStore.patterns());
 }
 
+/** Lines a "show first / last" click reveals from a big gap. */
+const GAP_STEP = 20;
+
 function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   const n = row.end - row.start;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'gap';
+  const expand = (start: number, end: number) => {
+    state.viewId++;
+    send({ type: 'expand', id: state.viewId, start, end });
+  };
   const fold = document.createElement('span');
   fold.className = 'fold';
   fold.setAttribute('aria-hidden', 'true');
@@ -328,15 +337,43 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   g.className = 'gutter';
   g.textContent = '⋯';
   const label = document.createElement('span');
-  label.textContent = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden, click to show`;
   const line = document.createElement('span');
   line.className = 'line';
-  btn.append(fold, g, label, line);
-  btn.addEventListener('click', () => {
-    state.viewId++;
-    send({ type: 'expand', id: state.viewId, start: row.start, end: row.end });
-  });
-  return btn;
+  const hidden = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden`;
+
+  if (n <= GAP_STEP * 2) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gap';
+    label.textContent = `${hidden}, click to show`;
+    btn.append(fold, g, label, line);
+    btn.addEventListener('click', () => expand(row.start, row.end));
+    return btn;
+  }
+  // A big gap: opening it all would push the lines you care about far away,
+  // so offer a few lines from the top or bottom of it too.
+  const div = document.createElement('div');
+  div.className = 'gap big';
+  label.textContent = `${hidden}:`;
+  const act = (text: string, title: string, start: number, end: number) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gap-act';
+    b.textContent = text;
+    b.title = title;
+    b.addEventListener('click', () => expand(start, end));
+    return b;
+  };
+  div.append(
+    fold,
+    g,
+    label,
+    act(`↑ first ${GAP_STEP}`, `Show the ${GAP_STEP} lines right after the line above`, row.start, row.start + GAP_STEP),
+    act(`↓ last ${GAP_STEP}`, `Show the ${GAP_STEP} lines right before the line below`, row.end - GAP_STEP, row.end),
+    act('show all', `Show all ${n.toLocaleString()} lines`, row.start, row.end),
+    line,
+  );
+  return div;
 }
 
 function scrollToRow(row: number): void {
@@ -364,22 +401,25 @@ function buildLevelButtons(counts: number[]): void {
     b.className = 'level';
     b.dataset.code = String(code);
     b.setAttribute('aria-pressed', 'true');
-    b.title = `Show or hide ${LEVEL_LABELS[code]!.toLowerCase()}`;
+    b.title = `Show only ${LEVEL_LABELS[code]!.toLowerCase()} (click again for all; Ctrl+click to add or remove)`;
     b.append(LEVEL_LABELS[code]!);
     const n = document.createElement('span');
     n.className = 'n';
     n.textContent = count.toLocaleString();
     b.append(n);
-    b.addEventListener('click', () => {
-      const pressed = b.getAttribute('aria-pressed') === 'true';
-      b.setAttribute('aria-pressed', String(!pressed));
-      state.query.levels = pressed ? state.query.levels.filter((c) => c !== code) : [...state.query.levels, code];
+    b.addEventListener('click', (e) => {
+      state.query.levels = nextLevels(state.query.levels, allLevels, code, e.ctrlKey || e.metaKey);
+      for (const other of levelsBar.querySelectorAll<HTMLButtonElement>('.level')) {
+        other.setAttribute('aria-pressed', String(state.query.levels.includes(Number(other.dataset.code))));
+      }
       requestView();
     });
     levelsBar.append(b);
   }
   state.query.levels = on;
+  allLevels = [...on];
 }
+let allLevels: number[] = [];
 
 function toggle(btn: HTMLButtonElement, apply: (on: boolean) => void): void {
   btn.addEventListener('click', () => {
@@ -478,7 +518,20 @@ function drawRules(): void {
       rm.textContent = '×';
       rm.setAttribute('aria-label', `Remove highlight ${r.term}`);
       rm.addEventListener('click', () => ruleStore.remove(i));
-      li.append(sw, term, rm);
+      const filterBtnEl = document.createElement('button');
+      filterBtnEl.type = 'button';
+      filterBtnEl.className = 'rule-filter';
+      filterBtnEl.textContent = 'Filter';
+      filterBtnEl.title = `Show only lines matching ${r.term}`;
+      filterBtnEl.addEventListener('click', () => applySearch(r.term, r.regex === true));
+      if (r.regex) {
+        const re = document.createElement('span');
+        re.className = 'rule-re';
+        re.textContent = '.*';
+        re.title = 'Regular expression';
+        term.after(re);
+      }
+      li.append(sw, term, filterBtnEl, rm);
       return li;
     }),
   );
@@ -500,6 +553,81 @@ ruleForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (ruleStore.add(ruleInput.value)) ruleInput.value = '';
 });
+
+/** Puts `text` in the search box and filters by it, as if typed. */
+function applySearch(text: string, regex: boolean): void {
+  search.value = text;
+  state.query.text = text;
+  state.query.regex = regex;
+  regexBtn.setAttribute('aria-pressed', String(regex));
+  state.query.filter = true;
+  filterBtn.setAttribute('aria-pressed', 'true');
+  ctxGroup.hidden = false;
+  state.current = -1;
+  saveSearchBtn.disabled = !text.trim();
+  requestView();
+}
+
+// Save: the current search joins the Highlights list, ready to reuse.
+const saveSearchBtn = $<HTMLButtonElement>('save-search');
+saveSearchBtn.addEventListener('click', () => {
+  if (ruleStore.add(search.value, state.query.regex)) {
+    saveSearchBtn.textContent = '★';
+    setTimeout(() => (saveSearchBtn.textContent = '☆'), 1200);
+  }
+});
+search.addEventListener('input', () => (saveSearchBtn.disabled = !search.value.trim()));
+
+// ---- Bookmarks, copy and save ----------------------------------------------
+
+$('bm-prev').addEventListener('click', () => findNext('bookmark', -1));
+$('bm-next').addEventListener('click', () => findNext('bookmark', 1));
+
+let exportMode: 'copy' | 'save' = 'copy';
+const copyBtn = $<HTMLButtonElement>('copy-shown');
+const saveBtn = $<HTMLButtonElement>('save-shown');
+/** The clipboard copes badly with very large text; past this, suggest saving instead. */
+const COPY_LIMIT_BYTES = 50 * 1024 * 1024;
+
+function flash(btn: HTMLButtonElement, text: string): void {
+  const was = btn.dataset.label ?? btn.textContent ?? '';
+  btn.dataset.label = was;
+  btn.textContent = text;
+  setTimeout(() => (btn.textContent = was), 1500);
+}
+
+copyBtn.addEventListener('click', () => {
+  exportMode = 'copy';
+  send({ type: 'export', id: state.viewId });
+});
+saveBtn.addEventListener('click', () => {
+  exportMode = 'save';
+  send({ type: 'export', id: state.viewId });
+});
+
+async function finishExport(blob: Blob, lines: number): Promise<void> {
+  const count = `${lines.toLocaleString()} ${lines === 1 ? 'line' : 'lines'}`;
+  if (exportMode === 'save') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const base = fileName.textContent?.replace(/(\.log)?(\.gz)?$/i, '') || 'log';
+    a.download = `${base}-shown.log`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    flash(saveBtn, `Saved ${count}`);
+    return;
+  }
+  if (blob.size > COPY_LIMIT_BYTES) {
+    flash(copyBtn, 'Too big to copy, use Save');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(await blob.text());
+    flash(copyBtn, `Copied ${count}`);
+  } catch {
+    flash(copyBtn, 'Copy failed, use Save');
+  }
+}
 
 // ---- Help -----------------------------------------------------------------
 
