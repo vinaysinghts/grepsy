@@ -348,16 +348,36 @@ try {
   await page.waitForSelector('#viewer:not([hidden])');
   await page.fill('#q', 'needle');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('3 rows'));
+  const rowsAre = (n) => page.waitForFunction((n) => document.querySelector('#status').textContent.startsWith(`${n} rows`), n);
   assert.match(await page.textContent('.gap.big'), /198 lines hidden/);
-  await page.click('.gap-act:has-text("first 20")');
-  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('23 rows'));
-  await page.click('.gap-act:has-text("last 20")');
-  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('43 rows'));
-  await page.locator('.row .fold').first().click();
-  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('23 rows'));
-  // The › arrow (like the rest of the row) shows all.
+  // Show more reveals 5 lines down from the line above, then keeps going down.
+  await page.click('.gap-act:has-text("↓ 5 more")');
+  await rowsAre(8);
+  await page.click('.gap-act:has-text("↓ 5 more")');
+  await rowsAre(13);
+  // The two steps joined into one block with one ⌄.
+  await page.waitForSelector('.row .fold[title="Hide 10 lines again"]');
+  assert.equal(await page.locator('.row .fold').count(), 1);
+  assert.equal(await page.getAttribute('.row .fold', 'title'), 'Hide 10 lines again');
+  await page.click('.row .fold');
+  await rowsAre(3);
+  // Clicking the row (the › arrow too) is "show more"; show all opens the rest.
   await page.click('.gap.big .fold');
-  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('200 rows'));
+  await rowsAre(8);
+  await page.click('.gap-act:has-text("show all")');
+  await rowsAre(200);
+  await page.waitForSelector('.row .fold[title="Hide 198 lines again"]');
+  assert.equal(await page.locator('.row .fold').count(), 1, 'the steps and the rest are one block');
+  // A gap at the top of the file grows up from the first line on show.
+  await page.fill('#q', 'needle end');
+  await rowsAre(2);
+  assert.equal(await page.locator('.gap-act:has-text("↓ 5 more")').count(), 0, 'nothing above the first line to grow down from');
+  await page.click('.gap-act:has-text("↑ 5 more")');
+  await rowsAre(7);
+  await page.waitForSelector('.row.revealed');
+  assert.equal(await page.textContent('.row.revealed .text'), 'filler 193');
+  await page.click('.gap-act:has-text("↑ 5 more")');
+  await rowsAre(12);
 
   // Auto-open is on by default (this test browser already allows file access,
   // so no setup step shows; that path is unit tested). It can be turned off.

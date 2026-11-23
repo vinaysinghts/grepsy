@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildView, gapRange, type ViewInput } from '../src/core/view';
+import { buildView, GAP_STEP, gapRange, gapStep, mergeRange, type ViewInput } from '../src/core/view';
 
 const base: ViewInput = {
   lineCount: 10,
@@ -55,5 +55,40 @@ describe('buildView', () => {
 
   it('returns no rows for an empty file', () => {
     expect(buildView({ ...base, lineCount: 0 }).length).toBe(0);
+  });
+});
+
+describe('mergeRange', () => {
+  it('keeps separate ranges apart and sorted', () => {
+    expect(mergeRange([[20, 25]], [3, 8])).toEqual([[3, 8], [20, 25]]);
+  });
+  it('joins a range that touches another', () => {
+    expect(mergeRange([[3, 8]], [8, 10])).toEqual([[3, 10]]);
+    expect(mergeRange([[8, 10]], [3, 8])).toEqual([[3, 10]]);
+  });
+  it('joins every range it overlaps', () => {
+    expect(mergeRange([[0, 2], [4, 6], [9, 12], [30, 31]], [1, 10])).toEqual([[0, 12], [30, 31]]);
+  });
+  it('ignores an empty range', () => {
+    expect(mergeRange([[1, 2]], [5, 5])).toEqual([[1, 2]]);
+  });
+});
+
+describe('gapStep', () => {
+  it('continues down from the line above by default', () => {
+    expect(gapStep({ start: 10, end: 100 })).toEqual([10, 10 + GAP_STEP]);
+  });
+  it('grows an opened block below the gap upwards', () => {
+    expect(gapStep({ start: 10, end: 100, beforeRevealed: true })).toEqual([100 - GAP_STEP, 100]);
+  });
+  it('grows the block above when both sides were opened', () => {
+    expect(gapStep({ start: 10, end: 100, afterRevealed: true, beforeRevealed: true })).toEqual([10, 10 + GAP_STEP]);
+  });
+  it('goes up from the first shown line when the gap starts the file', () => {
+    expect(gapStep({ start: 0, end: 50 })).toEqual([50 - GAP_STEP, 50]);
+  });
+  it('stops at the next shown line', () => {
+    expect(gapStep({ start: 4, end: 8 })).toEqual([4, 8]);
+    expect(gapStep({ start: 4, end: 8, beforeRevealed: true })).toEqual([4, 8]);
   });
 });

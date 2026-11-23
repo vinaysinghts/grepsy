@@ -3,7 +3,7 @@ import { detectLevel } from '../core/level';
 import { LineStore } from '../core/lineStore';
 import { compileQuery } from '../core/query';
 import { readLines } from '../core/readLines';
-import { buildView, gapRange, isGap } from '../core/view';
+import { buildView, gapRange, isGap, mergeRange } from '../core/view';
 import type { Request, Response, Row, ViewQuery } from './protocol';
 
 // All file data lives here, off the main thread. The page only ever asks for
@@ -104,7 +104,10 @@ function getRows(id: number, start: number, count: number): void {
     const v = rows[r]!;
     if (isGap(v)) {
       const [s, e] = gapRange(rows, r, store.length);
-      out.push({ kind: 'gap', start: s, end: e });
+      const gap: Row = { kind: 'gap', start: s, end: e };
+      if (s > 0 && expanded[s - 1] === 1) gap.afterRevealed = true;
+      if (e < store.length && expanded[e] === 1) gap.beforeRevealed = true;
+      out.push(gap);
     } else {
       const row: Row = { kind: 'line', line: v, text: store.text(v), level: store.level(v), bookmarked: bookmarks.has(v) };
       const range = openedRange(v);
@@ -179,8 +182,9 @@ self.onmessage = (e: MessageEvent<Request>) => {
       rebuild(m.id);
       break;
     case 'expand':
-      expanded.fill(1, m.start, m.end);
-      opened.push([m.start, m.end]);
+      // Ranges that touch or overlap become one block with one ⌄.
+      opened = mergeRange(opened, [m.start, m.end]);
+      for (const [s, e] of opened) expanded.fill(1, s, e);
       rebuild(m.id);
       break;
     case 'collapse':

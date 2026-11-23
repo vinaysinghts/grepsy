@@ -35,7 +35,15 @@ export type Row =
       /** Shown only because the user revealed it from a gap. */
       extra?: boolean;
     }
-  | { kind: 'gap'; start: number; end: number };
+  | {
+      kind: 'gap';
+      start: number;
+      end: number;
+      /** The line just above the gap was revealed by the user (so "show more" continues down from it). */
+      afterRevealed?: boolean;
+      /** The line just below the gap was revealed by the user (so "show more" continues up from it). */
+      beforeRevealed?: boolean;
+    };
 
 export type Response =
   | { type: 'progress'; lines: number; bytes: number; totalBytes: number }

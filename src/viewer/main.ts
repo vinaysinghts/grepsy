@@ -5,6 +5,7 @@ import { LEVEL_COUNT } from '../core/lineStore';
 import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
+import { GAP_SMALL, GAP_STEP, gapStep } from '../core/view';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
@@ -360,12 +361,9 @@ function patterns(): Pattern[] {
   return list.concat(ruleStore.patterns());
 }
 
-/** Lines a "show first / last" click reveals from a big gap. */
-const GAP_STEP = 20;
-
 function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   const n = row.end - row.start;
-  const expand = (start: number, end: number) => {
+  const expand = ([start, end]: [number, number]) => {
     state.viewId++;
     send({ type: 'expand', id: state.viewId, start, end });
   };
@@ -381,21 +379,21 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   line.className = 'line';
   const hidden = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden`;
 
-  if (n <= GAP_STEP * 2) {
+  if (n <= GAP_SMALL) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'gap';
     label.textContent = `${hidden}, click to show`;
     btn.append(fold, g, label, line);
-    btn.addEventListener('click', () => expand(row.start, row.end));
+    btn.addEventListener('click', () => expand([row.start, row.end]));
     return btn;
   }
-  // A big gap: opening it all would push the lines you care about far away,
-  // so offer a few lines from the top or bottom of it too.
+  // A big gap stays one bar: it shrinks from either edge as lines are
+  // revealed, and goes away once it is empty, so revealed blocks join up.
   const div = document.createElement('div');
   div.className = 'gap big';
   label.textContent = `${hidden}:`;
-  const act = (text: string, title: string, start: number, end: number) => {
+  const act = (text: string, title: string, range: [number, number]) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'gap-act';
@@ -403,22 +401,26 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     b.title = title;
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      expand(start, end);
+      expand(range);
     });
     return b;
   };
-  // Anywhere else on the row (the › arrow, the text) shows all, as on small gaps.
-  div.title = `Show all ${n.toLocaleString()} lines`;
-  div.addEventListener('click', () => expand(row.start, row.end));
-  div.append(
-    fold,
-    g,
-    label,
-    act(`↑ first ${GAP_STEP}`, `Show the ${GAP_STEP} lines right after the line above`, row.start, row.start + GAP_STEP),
-    act(`↓ last ${GAP_STEP}`, `Show the ${GAP_STEP} lines right before the line below`, row.end - GAP_STEP, row.end),
-    act('show all', `Show all ${n.toLocaleString()} lines`, row.start, row.end),
-    line,
-  );
+  const acts: HTMLElement[] = [];
+  // ↑ grows the lines below the gap upwards; ↓ grows the lines above downwards.
+  // Neither is offered at the edge of the file, where there is nothing to grow.
+  if (row.end < state.lines) {
+    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
+  }
+  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
+  if (row.start > 0) {
+    acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
+  }
+  // Anywhere else on the row (the › arrow, the text) shows more next to
+  // the block you are already opening.
+  const step = gapStep(row);
+  div.title = `Show ${GAP_STEP} more lines`;
+  div.addEventListener('click', () => expand(step));
+  div.append(fold, g, label, ...acts, line);
   return div;
 }
 
