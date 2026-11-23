@@ -350,6 +350,9 @@ try {
   await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn off');
   assert.match(await popup.textContent('#auto-open-title'), /Always open \.log files/);
   assert.match(await popup.textContent('#auto-open-status'), /^On\./);
+  // Web .log links are a separate opt-in (it needs access to every site).
+  await popup.waitForFunction(() => document.querySelector('#auto-open-web-status')?.textContent.startsWith('Off.'));
+  assert.equal(await popup.textContent('#auto-open-web-btn'), 'Turn on');
   await popup.click('#auto-open-btn');
   await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
   assert.equal(await popup.isHidden('#file-access-step'), true);

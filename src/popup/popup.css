@@ -35,3 +35,4 @@ html:has(body.popup) { height: auto; }
 .popup-auto-title { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-strong); }
 .popup-auto-row p { margin: 2px 0 0; font-size: 11px; }
 .popup-auto-row .tool-btn { flex: none; }
+.popup-auto-sub .popup-auto-title { font-weight: 500; }

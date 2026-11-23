@@ -7,7 +7,7 @@ import {
   type RecentLog,
 } from '../core/recent';
 import { accessStep, originPattern, tabOffer, type PendingOpen, type TabOffer } from '../core/currentTab';
-import { setupAutoOpen } from '../viewer/sources';
+import { setupAutoOpen, setupAutoOpenWeb } from '../viewer/sources';
 import { setupTheme } from '../viewer/theme';
 
 // First, so the popup paints in the right theme.
@@ -161,3 +161,4 @@ async function offerActiveTab(): Promise<void> {
 
 void offerActiveTab();
 void setupAutoOpen();
+void setupAutoOpenWeb();

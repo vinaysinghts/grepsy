@@ -12,6 +12,32 @@ export function shouldAutoOpen(url: string): boolean {
   return u.protocol === 'file:' && LOG_NAME.test(decodeURIComponent(u.pathname));
 }
 
+/**
+ * Whether a web tab URL looks like a log worth checking for auto-open. The
+ * name is only a first filter: the page must also turn out to be plain text.
+ */
+export function shouldAutoOpenWeb(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  return (u.protocol === 'https:' || u.protocol === 'http:') && LOG_NAME.test(decodeURIComponent(u.pathname));
+}
+
+/** Web origins "open .log links on websites" needs: every site, asked for only when the user turns it on. */
+export const WEB_ORIGINS = ['https://*/*', 'http://*/*'];
+
+/**
+ * Whether to send this tab to the viewer, given the URL it last left for the
+ * viewer. Without this, Back from the viewer would land on the log and be
+ * sent straight back: a trap.
+ */
+export function isReturnVisit(url: string, lastRedirected: unknown): boolean {
+  return typeof lastRedirected === 'string' && lastRedirected === url;
+}
+
 /** The URLs the viewer may load from its `?src=` parameter. */
 export function isLoadableSource(url: string): boolean {
   try {

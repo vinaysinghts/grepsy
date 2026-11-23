@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isReturnVisit, shouldAutoOpenWeb } from '../src/core/autoOpen';
 import { autoOpenView, autoOpenWanted, fileNameFromUrl, isLoadableSource, shouldAutoOpen } from '../src/core/autoOpen';
 
 describe('shouldAutoOpen', () => {
@@ -68,5 +69,26 @@ describe('autoOpenWanted', () => {
     expect(autoOpenWanted(undefined)).toBe(true);
     expect(autoOpenWanted(true)).toBe(true);
     expect(autoOpenWanted(false)).toBe(false);
+  });
+});
+
+describe('shouldAutoOpenWeb', () => {
+  it('takes log-named web links', () => {
+    expect(shouldAutoOpenWeb('https://raw.githubusercontent.com/logpai/loghub/refs/heads/master/Hadoop/Hadoop_2k.log')).toBe(true);
+    expect(shouldAutoOpenWeb('http://ci.local/build/42/output.out?raw=1')).toBe(true);
+  });
+  it('skips pages and local files', () => {
+    expect(shouldAutoOpenWeb('https://github.com/logpai/loghub/blob/master/Hadoop/README.md')).toBe(false);
+    expect(shouldAutoOpenWeb('https://example.com/')).toBe(false);
+    expect(shouldAutoOpenWeb('file:///var/log/app.log')).toBe(false);
+    expect(shouldAutoOpenWeb('not a url')).toBe(false);
+  });
+});
+
+describe('isReturnVisit', () => {
+  it('lets Back from the viewer land on the log', () => {
+    expect(isReturnVisit('https://x.dev/a.log', 'https://x.dev/a.log')).toBe(true);
+    expect(isReturnVisit('https://x.dev/b.log', 'https://x.dev/a.log')).toBe(false);
+    expect(isReturnVisit('https://x.dev/a.log', undefined)).toBe(false);
   });
 });
