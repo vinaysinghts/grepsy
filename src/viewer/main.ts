@@ -5,7 +5,7 @@ import { LEVEL_COUNT } from '../core/lineStore';
 import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
-import { GAP_SMALL, GAP_STEP, gapStep } from '../core/view';
+import { GAP_SMALL, GAP_STEP } from '../core/view';
 import { rowAtUnit, wrapColumns } from '../core/wrap';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
@@ -439,19 +439,9 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   line.className = 'line';
   const hidden = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden`;
 
-  if (n <= GAP_SMALL) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'gap';
-    label.textContent = `${hidden}, click to show`;
-    btn.append(g, label, line);
-    btn.addEventListener('click', () => expand([row.start, row.end]));
-    return btn;
-  }
-  // A big gap stays one bar: it shrinks from either edge as lines are
-  // revealed, and goes away once it is empty, so revealed blocks join up.
+  // Only the buttons act; the "N lines hidden" text is just a label.
   const div = document.createElement('div');
-  div.className = 'gap big';
+  div.className = n > GAP_SMALL ? 'gap big' : 'gap';
   label.textContent = `${hidden}:`;
   const act = (text: string, title: string, range: [number, number]) => {
     const b = document.createElement('button');
@@ -459,27 +449,22 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     b.className = 'gap-act';
     b.textContent = text;
     b.title = title;
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      expand(range);
-    });
+    b.addEventListener('click', () => expand(range));
     return b;
   };
   const acts: HTMLElement[] = [];
-  // ↑ grows the lines below the gap upwards; ↓ grows the lines above downwards.
+  // Small gaps open whole: a "show more" step would only cost clicks. A big
+  // gap stays one bar that shrinks from either edge as lines are revealed,
+  // and goes away once it is empty, so revealed blocks join up.
+  // ↓ grows the lines above the gap downwards; ↑ grows the lines below upwards.
   // Neither is offered at the edge of the file, where there is nothing to grow.
-  if (row.start > 0) {
+  if (n > GAP_SMALL && row.start > 0) {
     acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
   }
   acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
-  if (row.end < state.lines) {
+  if (n > GAP_SMALL && row.end < state.lines) {
     acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
   }
-  // Anywhere else on the row (the text) shows more next to
-  // the block you are already opening.
-  const step = gapStep(row);
-  div.title = `Show ${GAP_STEP} more lines`;
-  div.addEventListener('click', () => expand(step));
   div.append(g, label, ...acts, line);
   return div;
 }

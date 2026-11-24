@@ -150,8 +150,7 @@ button { font: inherit; color: inherit; }
 .row.bookmarked .gutter::before { content: '◆ '; }
 .text { padding-right: 24px; }
 mark { background: var(--hit); color: inherit; border-radius: 2px; }
-.gap { display: flex; align-items: center; width: 100%; height: var(--row-h); padding: 0; background: none; border: 0; color: var(--faint); font: inherit; text-align: left; cursor: pointer; }
-.gap:hover { color: var(--text); }
+.gap { display: flex; align-items: center; width: 100%; height: var(--row-h); padding: 0; background: none; border: 0; color: var(--faint); font: inherit; text-align: left; }
 .gap .gutter { border-right-color: transparent; }
 .gap .line { flex: 1; border-top: 1px dashed var(--border); margin-left: 8px; }
 
@@ -244,9 +243,8 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .bm-nav[hidden] { display: none; }
 .bm-nav .link-btn { font-size: 14px; line-height: 1; }
 /* Big gaps: show a few lines from either end, or all. */
-.gap.big { cursor: pointer; }
-.gap.big .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
-.gap.big .gap-act:hover { color: var(--accent); background: var(--raised); }
+.gap .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
+.gap .gap-act:hover { color: var(--accent); background: var(--raised); }
 .rule-re { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 /* Loading: the Grepsy mark, its lens sweeping the lines. */
 .loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--bg); }

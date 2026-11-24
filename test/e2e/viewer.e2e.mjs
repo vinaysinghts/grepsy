@@ -44,7 +44,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
 
   await page.waitForSelector('.gap');
-  await page.locator('.gap').last().click();
+  await page.locator('.gap .gap-act:has-text("show all")').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
   // Revealed lines can be hidden again, back to the filtered view.
   await page.waitForSelector('.row.revealed');
@@ -52,7 +52,7 @@ try {
   await page.click('.row .fold');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
   assert.equal(await page.locator('.row.revealed').count(), 0);
-  await page.locator('.gap').last().click();
+  await page.locator('.gap .gap-act:has-text("show all")').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
 
   await page.locator('.row .gutter').first().click();
@@ -366,8 +366,12 @@ try {
   assert.equal(await page.getAttribute('.row .fold', 'title'), 'Hide 10 lines again');
   await page.click('.row .fold');
   await rowsAre(3);
-  // Clicking the row itself is "show more"; show all opens the rest.
+  // The "lines hidden" text is only a label: clicking it does nothing.
   await page.click('.gap.big .gutter');
+  await page.click('.gap.big span:not(.gutter):not(.line)');
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent('#status'), /^3 rows/);
+  await page.click('.gap-act:has-text("↓ 5 more")');
   await rowsAre(8);
   await page.click('.gap-act:has-text("show all")');
   await rowsAre(200);

@@ -88,13 +88,3 @@ export const GAP_STEP = 5;
 /** Gaps this small open fully in one click: "show more" would only cost clicks. */
 export const GAP_SMALL = 10;
 
-/**
- * The part of a gap one "show more" reveals: the lines next to a block the
- * user already opened (so it grows that block, like a code review diff),
- * else the lines right after the line above. Always inside the gap, so it
- * stops at the next line on show.
- */
-export function gapStep(row: { start: number; end: number; afterRevealed?: boolean; beforeRevealed?: boolean }): [number, number] {
-  const up = (row.beforeRevealed && !row.afterRevealed) || row.start === 0;
-  return up ? [Math.max(row.start, row.end - GAP_STEP), row.end] : [row.start, Math.min(row.end, row.start + GAP_STEP)];
-}
