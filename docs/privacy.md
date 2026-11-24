@@ -22,7 +22,7 @@ Grepsy is a log viewer that runs entirely inside your browser.
 
 | Permission | When it is asked | Why |
 | --- | --- | --- |
-| `storage` | At install (shows no warning) | Saves your highlight rules. |
+| `storage` | At install (shows no warning) | Saves your quick filters (and which of them are highlights). |
 | `activeTab`, `scripting` | At install (show no warning) | Only when you click the Grepsy icon: checks whether the current tab is a plain text file, so the popup can offer to open it. Nothing from the page is read or sent. |
 | Access to `file:///*` | At install (shows no warning). Chrome also needs you to turn on "Allow access to file URLs" | Sends local `.log` files you open in the browser to the viewer, and lets the viewer read them. You can turn this off in the popup. |
 | Access to `http://*/*`, `https://*/*` | Only when you open a log from a URL or from the current tab, and only for that site; or for all sites if you click "Allow websites" under "Always open .log files" | Downloads the log you asked for. |

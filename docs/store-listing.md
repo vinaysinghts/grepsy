@@ -24,9 +24,10 @@ Drop in a .log, .txt, .jsonl or .gz file, paste text, or open a URL. Then:
 • Filter to matching lines, with ±2 or ±5 lines of context, and click to reveal hidden lines
 • Show or hide Errors, Warnings, Info and Debug lines; stack traces stay with their error
 • Press N to jump to the next error, Enter for the next match
-• Color any term with saved highlight rules
+• Save quick filters and mark any of them as highlights
 • Bookmark lines and jump between them with F2
-• Pretty-print JSON found inside a log line
+• Pretty-print JSON and object dumps found inside a log line
+• Word wrap for long lines
 • Light, dark, or follow your system theme
 • Viewing a plain text log in a tab? Click the Grepsy icon and open it right there
 • Local .log files open straight in Grepsy (turn off any time in the popup)
@@ -35,7 +36,7 @@ Drop in a .log, .txt, .jsonl or .gz file, paste text, or open a URL. Then:
 
 Built for speed: a 1 million line, 76 MB log is ready in under a second. Lines are parsed in a background worker and drawn with virtual scrolling, so the page stays responsive.
 
-Private by design: your files never leave your computer. No analytics, no accounts, no remote code. Nothing is asked at install beyond storage for your highlight rules and a one-tab look when you click the Grepsy icon.
+Private by design: your files never leave your computer. No analytics, no accounts, no remote code. Nothing is asked at install beyond storage for your quick filters and a one-tab look when you click the Grepsy icon.
 
 Open source: https://github.com/vinaysinghts/grepsy
 
@@ -45,7 +46,7 @@ View, search and filter log files locally in the browser.
 
 ## Permission justifications (for the review form)
 
-- **storage:** saves the user's highlight rules between sessions.
+- **storage:** saves the user's quick filters between sessions.
 - **activeTab:** when the user clicks the Grepsy icon, lets the popup read the current tab's URL so it can offer to open a plain text log from that tab in the viewer.
 - **scripting:** with activeTab only, runs a one-line check (`document.contentType`) in the current tab after the icon is clicked, so the offer appears only for plain text files and never on web pages. No other code is injected and nothing is read from the page.
 - **Host permission file:///*:** sends local .log files the user opens in Chrome to the viewer (on by default, can be turned off in the popup) and lets the viewer read them. It only takes effect once the user turns on "Allow access to file URLs".

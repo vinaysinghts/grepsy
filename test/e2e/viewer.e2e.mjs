@@ -75,13 +75,13 @@ try {
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#save-shown')]);
   assert.equal(download.suggestedFilename(), 'sample-shown.log');
 
-  // Save the search, then reuse it from the Highlights list in one click.
+  // Save the search, then reuse it from Quick filters in one click.
   await page.click('#save-search');
   await page.click('#rules-toggle');
-  await page.waitForSelector('.rule-filter');
+  await page.waitForSelector('.rule-term');
   await page.fill('#q', '');
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '');
-  await page.click('.rule-filter');
+  await page.click('.rule-term');
   assert.equal(await page.inputValue('#q'), 'timeout');
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '3 matches');
   assert.equal(await page.isHidden('#rules-panel'), true, 'the dropdown closes to show the results');
@@ -97,6 +97,8 @@ try {
   await page.keyboard.press('n');
   await page.waitForSelector('.row.current');
   assert.match(await page.textContent('.row.current'), /ERROR \[payments\]/);
+  // The landing line flashes once, then settles.
+  await page.waitForSelector('.row.current.flash');
 
   // Hiding warnings collapses them into a gap. (The DEBUG line stays: it is bookmarked.)
   // A plain click shows only that level; a second click shows all again.
@@ -115,26 +117,23 @@ try {
   assert.equal(await page.locator('.row', { hasText: 'WARN' }).count(), 0);
   assert.equal(await page.locator('.row', { hasText: 'DEBUG' }).count(), 1);
 
-  // Highlight rules: add one, see it color the text, and find it again after a reload.
+  // Quick filters: add one, mark it as a highlight, and find it again after a reload.
   await page.click('#rules-toggle');
   await page.fill('#rule-input', 'user_id=42');
   await page.press('#rule-input', 'Enter');
+  assert.equal(await page.textContent('#rules-toggle'), 'Quick filters 1');
+  assert.equal(await page.locator('mark.hl0').count(), 0, 'a new quick filter is not a highlight');
+  await page.click('.rules .swatch.off');
   await page.waitForSelector('mark.hl0', { state: 'attached' });
-  assert.equal(await page.textContent('#rules-toggle'), 'Highlights 1');
-  // Saved terms edit in place, and the color dot cycles colors.
-  await page.click('.rule-term');
+  // Saved terms edit in place with ✎.
+  await page.click('.rule-edit-btn');
   await page.fill('.rule-edit', 'user_id=56');
   await page.press('.rule-edit', 'Enter');
   await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=56');
-  await page.click('.rule-term');
+  await page.click('.rule-edit-btn');
   await page.fill('.rule-edit', 'user_id=42');
   await page.press('.rule-edit', 'Enter');
   await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=42');
-  await page.click('.rules .swatch');
-  await page.waitForSelector('.rules .swatch.hl1');
-  await page.click('.rules .swatch');
-  for (let i = 0; i < 4; i++) await page.click('.rules .swatch');
-  await page.waitForSelector('.rules .swatch.hl0');
   await page.reload();
   await page.setInputFiles('#file', sample);
   await page.waitForSelector('mark.hl0', { state: 'attached' });
@@ -174,14 +173,20 @@ try {
 
   // A gzipped log with JSON in a line: decompressed on open, JSON shown pretty-printed.
   await page.reload();
-  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO done'];
+  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO saved User{id=7, roles=[admin, ops]} req={"a":1}'];
   await page.setInputFiles('#file', { name: 'app.log.gz', mimeType: 'application/gzip', buffer: gzipSync(gzLines.join('\n')) });
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('3 rows'));
   await page.waitForSelector('.json-btn');
-  assert.equal(await page.locator('.json-btn').count(), 1);
-  await page.click('.json-btn');
+  assert.equal(await page.locator('.json-btn').count(), 2);
+  await page.locator('.json-btn').first().click();
   await page.waitForSelector('#json-dialog[open]');
-  assert.equal(await page.textContent('#json-body'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
+  assert.equal(await page.textContent('#json-body pre'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
+  await page.keyboard.press('Escape');
+  // A line with a Java-style dump and JSON shows both, laid out.
+  await page.locator('.json-btn').last().click();
+  await page.waitForSelector('#json-dialog[open]');
+  assert.deepEqual(await page.locator('.json-name').allTextContents(), ['1 of 2 · User', '2 of 2 · req']);
+  assert.equal(await page.locator('#json-body pre').first().textContent(), '{\n  id=7,\n  roles=[\n    admin,\n    ops\n  ]\n}');
   await page.keyboard.press('Escape');
 
   // Pasted text opens like a file.
@@ -378,6 +383,27 @@ try {
   assert.equal(await page.textContent('.row.revealed .text'), 'filler 193');
   await page.click('.gap-act:has-text("↑ 5 more")');
   await rowsAre(12);
+
+  // Word wrap (Alt+Z): long lines wrap, each row exactly as tall as its text.
+  const wide = ['short one', 'long ' + 'abcdefghij'.repeat(60), 'tab\tseparated\tline ' + 'x'.repeat(300), 'short two'].join('\n');
+  await page.goto(`chrome-extension://${id}/viewer.html`);
+  await page.setInputFiles('#file', { name: 'wide.log', mimeType: 'text/plain', buffer: Buffer.from(wide) });
+  await page.waitForSelector('#viewer:not([hidden]) .row .text');
+  await page.locator('#log').focus();
+  await page.keyboard.press('Alt+KeyZ');
+  await page.waitForSelector('.rows.wrap');
+  assert.equal(await page.getAttribute('#wrap-toggle', 'aria-pressed'), 'true');
+  const fit = await page.$$eval('.rows.wrap .row', (rows) =>
+    rows.map((r) => [Math.round(r.getBoundingClientRect().height), Math.round(r.querySelector('.text').getBoundingClientRect().height)]),
+  );
+  assert.ok(fit[1][0] > 20, 'the long line wraps');
+  for (const [row, text] of fit) assert.equal(text, row, 'each row is as tall as its wrapped text');
+  // The last line is still reachable at the bottom.
+  await page.evaluate(() => { const l = document.querySelector('#log'); l.scrollTop = l.scrollHeight; });
+  await page.waitForSelector('.row:has-text("short two")');
+  await page.click('#wrap-toggle');
+  await page.waitForSelector('.rows:not(.wrap)');
+  assert.equal(await page.getAttribute('#wrap-toggle', 'aria-pressed'), 'false');
 
   // Auto-open is on by default (this test browser already allows file access,
   // so no setup step shows; that path is unit tested). It can be turned off.

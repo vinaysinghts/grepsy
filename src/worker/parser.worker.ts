@@ -4,6 +4,7 @@ import { LineStore } from '../core/lineStore';
 import { compileQuery } from '../core/query';
 import { readLines } from '../core/readLines';
 import { buildView, gapRange, isGap, mergeRange } from '../core/view';
+import { visualLines, wrapStarts } from '../core/wrap';
 import type { Request, Response, Row, ViewQuery } from './protocol';
 
 // All file data lives here, off the main thread. The page only ever asks for
@@ -201,6 +202,15 @@ self.onmessage = (e: MessageEvent<Request>) => {
     case 'rows':
       getRows(m.id, m.start, m.count);
       break;
+    case 'wrap': {
+      // Gap rows are always one screen line; text rows wrap at `cols`.
+      const starts = wrapStarts(rows.length, (r) => {
+        const v = rows[r]!;
+        return isGap(v) ? 1 : visualLines(store.text(v), m.cols);
+      });
+      post({ type: 'wrap', id: m.id, cols: m.cols, starts });
+      break;
+    }
     case 'export':
       exportShown(m.id);
       break;

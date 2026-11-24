@@ -6,13 +6,19 @@ export interface HighlightRule {
   color: number;
   /** The term is a regular expression (saved from a regex search). */
   regex?: boolean;
+  /** Colored in every log. Off: the filter is only one click away in the list. */
+  highlight: boolean;
 }
 
 const STORAGE_KEY = 'highlightRules';
 export const COLOR_COUNT = 6;
 export const MAX_RULES = 20;
 
-/** Highlight rules, saved in extension storage so they apply to every log. */
+/**
+ * Quick filters, saved in extension storage so they apply to every log.
+ * Each one filters in one click and can also be marked as a highlight.
+ * (Stored under the old "highlightRules" key so saved terms carry over.)
+ */
 export class RuleStore {
   rules: HighlightRule[] = [];
   private listeners: (() => void)[] = [];
@@ -24,7 +30,8 @@ export class RuleStore {
       if (Array.isArray(saved)) {
         this.rules = saved
           .filter((r): r is HighlightRule => typeof r?.term === 'string' && Number.isInteger(r?.color))
-          .map((r) => ({ term: r.term, color: r.color, ...(r.regex === true ? { regex: true } : {}) }))
+          // Terms saved before quick filters were all highlights, so they stay highlighted.
+          .map((r) => ({ term: r.term, color: r.color, highlight: r.highlight !== false, ...(r.regex === true ? { regex: true } : {}) }))
           .slice(0, MAX_RULES);
       }
     } catch {
@@ -37,7 +44,7 @@ export class RuleStore {
     this.listeners.push(fn);
   }
 
-  add(term: string, regex = false): boolean {
+  add(term: string, regex = false, highlight = false): boolean {
     // Kept exactly as typed: a leading space is meaningful (" steps" ≠ "steps").
     const t = term;
     if (!t.trim() || this.rules.length >= MAX_RULES) return false;
@@ -47,7 +54,7 @@ export class RuleStore {
     let color = 0;
     while (used.has(color) && color < COLOR_COUNT - 1) color++;
     if (used.has(color)) color = this.rules.length % COLOR_COUNT;
-    this.rules = [...this.rules, { term: t, color, ...(regex ? { regex: true } : {}) }];
+    this.rules = [...this.rules, { term: t, color, highlight, ...(regex ? { regex: true } : {}) }];
     this.save();
     return true;
   }
@@ -67,10 +74,10 @@ export class RuleStore {
     return true;
   }
 
-  /** Moves a saved term to the next highlight color. */
-  nextColor(index: number): void {
+  /** Turns coloring a saved term in every log on or off. */
+  toggleHighlight(index: number): void {
     if (!this.rules[index]) return;
-    this.rules = this.rules.map((r, i) => (i === index ? { ...r, color: (r.color + 1) % COLOR_COUNT } : r));
+    this.rules = this.rules.map((r, i) => (i === index ? { ...r, highlight: !r.highlight } : r));
     this.save();
   }
 
@@ -79,10 +86,11 @@ export class RuleStore {
     this.save();
   }
 
-  /** Patterns for splitTagged: terms match literally (or as a regex if saved as one), ignoring case. */
+  /** Patterns for splitTagged, for terms marked as highlights: literal (or regex if saved as one), ignoring case. */
   patterns(): Pattern[] {
     const out: Pattern[] = [];
     for (const r of this.rules) {
+      if (!r.highlight) continue;
       const q = compileQuery({ text: r.term, caseSensitive: false, regex: r.regex === true });
       if (q.kind === 'ok') out.push({ re: q.highlight, tag: r.color });
     }
