@@ -406,12 +406,12 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   const acts: HTMLElement[] = [];
   // ↑ grows the lines below the gap upwards; ↓ grows the lines above downwards.
   // Neither is offered at the edge of the file, where there is nothing to grow.
-  if (row.end < state.lines) {
-    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
-  }
-  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
   if (row.start > 0) {
     acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
+  }
+  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
+  if (row.end < state.lines) {
+    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
   }
   // Anywhere else on the row (the text) shows more next to
   // the block you are already opening.
