@@ -26,7 +26,7 @@ Drop in a .log, .txt, .jsonl or .gz file, paste text, or open a URL. Then:
 • Press N to jump to the next error, Enter for the next match
 • Save quick filters and mark any of them as highlights
 • Bookmark lines and jump between them with F2
-• Pretty-print JSON and object dumps found inside a log line
+• Pretty-print JSON and XML found inside a log line
 • Word wrap for long lines
 • Light, dark, or follow your system theme
 • Viewing a plain text log in a tab? Click the Grepsy icon and open it right there

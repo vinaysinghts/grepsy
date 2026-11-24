@@ -133,7 +133,6 @@ button { font: inherit; color: inherit; }
 .rows.wrap { right: 0; }
 .rows.wrap .row { overflow: hidden; align-items: flex-start; }
 .rows.wrap .row .text { flex: none; width: calc(var(--wrap-cols) * 1ch); padding-right: 0; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; tab-size: 4; }
-.rows.wrap .json-btn { align-self: flex-start; margin-top: 2px; }
 #wrap-toggle[aria-pressed="true"] { color: var(--accent); }
 /* The line a jump lands on flashes once (FLASH_MS in main.ts). */
 .row.flash { animation: flash 900ms ease-out both; }
@@ -212,8 +211,8 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .paste-box textarea:focus { border-color: var(--accent); }
 .tool-btn.primary { align-self: flex-start; background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
-.json-btn { flex: none; align-self: center; height: 16px; margin-left: 8px; padding: 0 5px; background: var(--raised); color: var(--link); border: 1px solid var(--border); border-radius: 4px; font: 500 10px/14px Inter, sans-serif; cursor: pointer; }
-.json-btn:hover { border-color: var(--accent); }
+.json-btn { position: absolute; left: 57px; top: 0; width: 13px; height: var(--row-h); padding: 0; background: none; border: 0; color: var(--link); font: 600 10px/var(--row-h) var(--mono); letter-spacing: -1px; text-align: center; cursor: pointer; opacity: 0.75; }
+.json-btn:hover { opacity: 1; background: var(--raised); border-radius: 3px; }
 .row.revealed .gutter { border-right-style: dashed; }
 /* Fold arrows at the gutter's left edge: › on a hidden run, ⌄ on one the user opened. */
 .row, .gap { position: relative; }

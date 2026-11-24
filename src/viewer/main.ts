@@ -406,10 +406,13 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
     if (found.length) {
       const btn = document.createElement('button');
       btn.type = 'button';
+      // Sits in the gap between the line number and the text, so it never
+      // pushes the text or hides at the end of a long line.
       btn.className = 'json-btn';
-      btn.textContent = '{ }';
-      btn.title = found.length === 1 ? 'Pretty print' : `Pretty print (${found.length} values)`;
-      btn.setAttribute('aria-label', `Pretty print line ${row.line + 1}`);
+      btn.textContent = found.every((f) => f.kind === 'xml') ? '<>' : '{}';
+      const what = found.length === 1 ? (found[0]!.kind === 'xml' ? 'XML' : 'JSON') : `${found.length} values`;
+      btn.title = `Pretty print ${what}`;
+      btn.setAttribute('aria-label', `Pretty print ${what} on line ${row.line + 1}`);
       btn.addEventListener('click', () => showStructures(row.line + 1, found));
       div.append(btn);
     }
@@ -902,7 +905,7 @@ function showStructures(lineNumber: number, found: Structure[]): void {
     if (found.length > 1 || f.name) {
       const h = document.createElement('div');
       h.className = 'json-name';
-      const what = f.name || (f.json ? 'JSON' : 'Value');
+      const what = f.name || (f.kind === 'xml' ? 'XML' : 'JSON');
       h.textContent = found.length > 1 ? `${i + 1} of ${found.length} · ${what}` : what;
       jsonBody.append(h);
     }
