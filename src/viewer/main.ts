@@ -326,7 +326,9 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   div.append(gutter, text);
   if (row.revealed) {
     const { start, end, count } = row.revealed;
-    // ⌄ hide on the first line of an opened run folds it back.
+    // ⌄ hide after the first line of an opened run folds it back. It sits
+    // after the text, not in the gutter, so it never covers the line number,
+    // and sticks to the right edge when the line runs off screen.
     const fold = document.createElement('button');
     fold.type = 'button';
     fold.className = 'fold';
@@ -338,7 +340,7 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
       state.viewId++;
       send({ type: 'collapse', id: state.viewId, start, end });
     });
-    div.prepend(fold);
+    div.append(fold);
   }
   if (mayContainJson(row.text)) {
     const found = extractJson(row.text);

@@ -200,7 +200,7 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .row.revealed .gutter { border-right-style: dashed; }
 /* Fold arrows at the gutter's left edge: › on a hidden run, ⌄ on one the user opened. */
 .row, .gap { position: relative; }
-.fold { position: absolute; left: 2px; top: 0; height: var(--row-h); padding: 0 4px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: 500 10px/var(--row-h) Inter, sans-serif; white-space: nowrap; cursor: pointer; }
+.fold { position: sticky; right: 8px; flex: none; align-self: center; height: 18px; margin-left: 16px; padding: 0 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; color: var(--muted); font: 500 10px/16px Inter, sans-serif; white-space: nowrap; cursor: pointer; }
 .fold:hover { color: var(--accent); background: var(--raised); }
 .json-dialog { width: min(720px, 90vw); }
 .json-dialog pre { max-height: 60vh; overflow: auto; margin: 0 0 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); color: var(--text-strong); }
