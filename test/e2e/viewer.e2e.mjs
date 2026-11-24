@@ -361,8 +361,8 @@ try {
   assert.equal(await page.getAttribute('.row .fold', 'title'), 'Hide 10 lines again');
   await page.click('.row .fold');
   await rowsAre(3);
-  // Clicking the row (the › arrow too) is "show more"; show all opens the rest.
-  await page.click('.gap.big .fold');
+  // Clicking the row itself is "show more"; show all opens the rest.
+  await page.click('.gap.big .gutter');
   await rowsAre(8);
   await page.click('.gap-act:has-text("show all")');
   await rowsAre(200);

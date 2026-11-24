@@ -326,11 +326,11 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   div.append(gutter, text);
   if (row.revealed) {
     const { start, end, count } = row.revealed;
-    // A fold arrow, like a code editor's: ⌄ on an opened run folds it back.
+    // ⌄ hide on the first line of an opened run folds it back.
     const fold = document.createElement('button');
     fold.type = 'button';
     fold.className = 'fold';
-    fold.textContent = '⌄';
+    fold.textContent = '⌄ hide';
     const label = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'} again`;
     fold.title = label;
     fold.setAttribute('aria-label', label);
@@ -367,10 +367,6 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     state.viewId++;
     send({ type: 'expand', id: state.viewId, start, end });
   };
-  const fold = document.createElement('span');
-  fold.className = 'fold';
-  fold.setAttribute('aria-hidden', 'true');
-  fold.textContent = '›';
   const g = document.createElement('span');
   g.className = 'gutter';
   g.textContent = '⋯';
@@ -384,7 +380,7 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     btn.type = 'button';
     btn.className = 'gap';
     label.textContent = `${hidden}, click to show`;
-    btn.append(fold, g, label, line);
+    btn.append(g, label, line);
     btn.addEventListener('click', () => expand([row.start, row.end]));
     return btn;
   }
@@ -415,12 +411,12 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   if (row.start > 0) {
     acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
   }
-  // Anywhere else on the row (the › arrow, the text) shows more next to
+  // Anywhere else on the row (the text) shows more next to
   // the block you are already opening.
   const step = gapStep(row);
   div.title = `Show ${GAP_STEP} more lines`;
   div.addEventListener('click', () => expand(step));
-  div.append(fold, g, label, ...acts, line);
+  div.append(g, label, ...acts, line);
   return div;
 }
 
