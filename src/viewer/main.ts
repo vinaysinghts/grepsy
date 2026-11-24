@@ -686,7 +686,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---- Highlight rules ------------------------------------------------------
+// ---- Quick filters -------------------------------------------------------
 
 const ruleStore = new RuleStore();
 const rulesPanel = $('rules-panel');

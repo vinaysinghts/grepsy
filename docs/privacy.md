@@ -8,7 +8,7 @@ Grepsy is a log viewer that runs entirely inside your browser.
 
 - **Log files and pasted text** are read and processed on your computer, in the extension's own page. They are never uploaded, sent to a server, or shared with anyone.
 - **Logs opened from a URL** are downloaded straight from that address by your browser. Grepsy does not send them anywhere else.
-- **Highlight rules** you create are saved with the browser's extension storage (`chrome.storage`) so they are there next time. If you use browser sync, your browser may sync them to your other devices.
+- **Quick filters** you save are kept in the browser's extension storage (`chrome.storage`) so they are there next time. If you use browser sync, your browser may sync them to your other devices.
 - **Your theme choice** is saved in the extension's local storage on this device.
 
 ## What Grepsy does not do
