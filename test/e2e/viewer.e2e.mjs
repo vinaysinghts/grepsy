@@ -176,16 +176,18 @@ try {
   const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO saved body=<order id="A-1"><item>pen</item></order> req={"a":1}'];
   await page.setInputFiles('#file', { name: 'app.log.gz', mimeType: 'application/gzip', buffer: gzipSync(gzLines.join('\n')) });
   await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('3 rows'));
-  await page.waitForSelector('.json-btn');
-  assert.equal(await page.locator('.json-btn').count(), 2);
-  await page.locator('.json-btn').first().click();
+  // Each JSON or XML value is underlined in place; clicking it opens just that value.
+  await page.waitForSelector('.pv');
+  assert.equal(await page.locator('.pv').count(), 3);
+  assert.equal(await page.locator('.pv').first().textContent(), '{"order":"A-1182","code":504}');
+  await page.locator('.pv').first().click();
   await page.waitForSelector('#json-dialog[open]');
   assert.equal(await page.textContent('#json-body pre'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
   await page.keyboard.press('Escape');
-  // A line with XML and JSON shows both, laid out.
-  await page.locator('.json-btn').last().click();
+  // XML on a line with JSON too: only the clicked value opens, under its name.
+  await page.locator('.pv').nth(1).click();
   await page.waitForSelector('#json-dialog[open]');
-  assert.deepEqual(await page.locator('.json-name').allTextContents(), ['1 of 2 · body', '2 of 2 · req']);
+  assert.deepEqual(await page.locator('.json-name').allTextContents(), ['body']);
   assert.equal(await page.locator('#json-body pre').first().textContent(), '<order id="A-1">\n  <item>pen</item>\n</order>');
   await page.keyboard.press('Escape');
 

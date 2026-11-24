@@ -21,7 +21,7 @@ npm run e2e      # load dist/ in Chromium and click through the viewer
 - **Filter:** turn on **Filter** to hide lines that don't match. Pick **context ±2/±5** to keep lines around each match, and click a "lines hidden" row to reveal it.
 - **Levels:** click Errors, Warnings, Info or Debug to hide or show them. Stack trace lines follow the level of the line they belong to.
 - **Bookmarks:** click a line number. Use `F2` / `Shift+F2` to jump between bookmarks.
-- **Pretty print:** lines that contain JSON or XML get a small `{}` (or `<>`) button beside the line number that lays out every value in the line.
+- **Pretty print:** JSON and XML inside a line get a faint dotted underline; click one to see it laid out.
 - **Quick filters:** save a search with ☆ or add one in **Quick filters**. Click it to filter; click its dot to also highlight it in every log. Saved across sessions.
 - **Word wrap:** **Wrap** in the status bar or Alt+Z.
 - **Jumps** (next match, error or bookmark) flash the line they land on.

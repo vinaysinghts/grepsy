@@ -339,6 +339,29 @@ function draw(): void {
   }
 }
 
+/** A JSON or XML value inside a line: underlined, and opens pretty-printed on click. */
+function valueEl(lineNumber: number, v: Structure): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'pv';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  const what = v.kind === 'xml' ? 'XML' : 'JSON';
+  el.title = `Pretty print this ${what}`;
+  const open = () => showStructures(lineNumber, [v]);
+  el.addEventListener('click', () => {
+    // Selecting text to copy it shouldn't open the dialog.
+    if (window.getSelection()?.toString()) return;
+    open();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+    }
+  });
+  return el;
+}
+
 /** Matches the .flash animation in styles.css. */
 const FLASH_MS = 900;
 
@@ -371,15 +394,30 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   const text = document.createElement('span');
   text.className = 'text';
   const shown = row.text.length > MAX_RENDERED_CHARS ? row.text.slice(0, MAX_RENDERED_CHARS) + ' …' : row.text;
+  // JSON and XML values get a dotted underline; clicking one pretty-prints it.
+  const values = mayContainStructure(shown) ? findStructures(shown) : [];
+  const holders = values.map((v) => valueEl(row.line + 1, v));
   // Log text is untrusted: it only ever goes in as text nodes, never as HTML.
+  let at = 0;
   for (const span of splitTagged(shown, patterns())) {
-    if (span.tag === null) {
-      text.append(span.text);
-    } else {
-      const mark = document.createElement('mark');
-      if (span.tag >= 0) mark.className = `hl${span.tag}`;
-      mark.textContent = span.text;
-      text.append(mark);
+    // Cut the span where a value starts or ends, so each piece lands in one place.
+    let rest = span.text;
+    while (rest) {
+      const v = values.findIndex((x) => at >= x.start && at < x.end);
+      const next = v >= 0 ? values[v]!.end : Math.min(...values.filter((x) => x.start > at).map((x) => x.start), Infinity);
+      const piece = rest.slice(0, Math.max(1, next - at));
+      rest = rest.slice(piece.length);
+      at += piece.length;
+      let node: Node | string = piece;
+      if (span.tag !== null) {
+        const mark = document.createElement('mark');
+        if (span.tag >= 0) mark.className = `hl${span.tag}`;
+        mark.textContent = piece;
+        node = mark;
+      }
+      const holder = v >= 0 ? holders[v]! : text;
+      if (v >= 0 && holder.parentNode !== text) text.append(holder);
+      holder.append(node);
     }
   }
   div.append(gutter, text);
@@ -400,22 +438,6 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
       send({ type: 'collapse', id: state.viewId, start, end });
     });
     div.append(fold);
-  }
-  if (mayContainStructure(row.text)) {
-    const found = findStructures(row.text);
-    if (found.length) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      // Sits in the gap between the line number and the text, so it never
-      // pushes the text or hides at the end of a long line.
-      btn.className = 'json-btn';
-      btn.textContent = found.every((f) => f.kind === 'xml') ? '<>' : '{}';
-      const what = found.length === 1 ? (found[0]!.kind === 'xml' ? 'XML' : 'JSON') : `${found.length} values`;
-      btn.title = `Pretty print ${what}`;
-      btn.setAttribute('aria-label', `Pretty print ${what} on line ${row.line + 1}`);
-      btn.addEventListener('click', () => showStructures(row.line + 1, found));
-      div.append(btn);
-    }
   }
   return div;
 }
