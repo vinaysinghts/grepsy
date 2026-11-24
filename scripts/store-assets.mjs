@@ -115,7 +115,6 @@ for (const term of ['payments', 'user_id=42']) {
   await page.press('#rule-input', 'Enter');
 }
 await page.fill('#q', 'timeout');
-await page.click('#filter');
 await page.click('[data-ctx="2"]');
 await page.waitForSelector('.gap');
 await page.waitForTimeout(300);

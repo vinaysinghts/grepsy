@@ -29,7 +29,9 @@ Drop in a .log, .txt, .jsonl or .gz file, paste text, or open a URL. Then:
 • Pretty-print JSON found inside a log line
 • Light, dark, or follow your system theme
 • Viewing a plain text log in a tab? Click the Grepsy icon and open it right there
-• Optional: open .log files from your computer straight in Grepsy
+• Local .log files open straight in Grepsy (turn off any time in the popup)
+• Copy or save just the lines you filtered
+• Save searches and reuse them in one click
 
 Built for speed: a 1 million line, 76 MB log is ready in under a second. Lines are parsed in a background worker and drawn with virtual scrolling, so the page stays responsive.
 
@@ -46,8 +48,8 @@ View, search and filter log files locally in the browser.
 - **storage:** saves the user's highlight rules between sessions.
 - **activeTab:** when the user clicks the Grepsy icon, lets the popup read the current tab's URL so it can offer to open a plain text log from that tab in the viewer.
 - **scripting:** with activeTab only, runs a one-line check (`document.contentType`) in the current tab after the icon is clicked, so the offer appears only for plain text files and never on web pages. No other code is injected and nothing is read from the page.
-- **Optional host permission file:///*:** requested only when the user turns on "Open .log files automatically", to redirect local .log files to the viewer.
-- **Optional host permissions http://*/*, https://*/*:** requested only when the user opens a log from a URL, to download that file.
+- **Host permission file:///*:** sends local .log files the user opens in Chrome to the viewer (on by default, can be turned off in the popup) and lets the viewer read them. It only takes effect once the user turns on "Allow access to file URLs".
+- **Optional host permissions http://*/*, https://*/*:** requested only when the user opens a log from a URL (for that one site), or for all sites when the user clicks "Allow websites" under the auto-open switch, so plain text .log links on websites open in the viewer. Pages are only taken over when Chrome reports them as plain text.
 - **Remote code:** none.
 
 ## Data usage disclosures

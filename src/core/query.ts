@@ -17,10 +17,14 @@ function escapeRegExp(s: string): string {
  * Turns the search box into regular expressions: one for testing a line, and
  * a global one for finding every match to highlight. Plain text is matched
  * literally; an invalid regex is reported instead of throwing.
+ *
+ * Spaces are part of the search, exactly as typed: " steps" finds "Test Steps"
+ * but not "diagnosticSteps". Only an all-space search counts as empty.
  */
 export function compileQuery(o: QueryOptions): CompiledQuery {
-  if (o.text === '') return { kind: 'empty' };
-  const source = o.regex ? o.text : escapeRegExp(o.text);
+  if (o.text.trim() === '') return { kind: 'empty' };
+  const text = o.text;
+  const source = o.regex ? text : escapeRegExp(text);
   const flags = o.caseSensitive ? '' : 'i';
   try {
     const test = new RegExp(source, flags);

@@ -3,7 +3,7 @@ import { detectLevel } from '../core/level';
 import { LineStore } from '../core/lineStore';
 import { compileQuery } from '../core/query';
 import { readLines } from '../core/readLines';
-import { buildView, gapRange, isGap } from '../core/view';
+import { buildView, gapRange, isGap, mergeRange } from '../core/view';
 import type { Request, Response, Row, ViewQuery } from './protocol';
 
 // All file data lives here, off the main thread. The page only ever asks for
@@ -17,6 +17,8 @@ let query: ViewQuery | null = null;
 let matcher: RegExp | null = null;
 const bookmarks = new Set<number>();
 let expanded = new Uint8Array(0);
+/** The gaps the user opened, as [start, end) line ranges, so each can be closed again. */
+let opened: Array<[number, number]> = [];
 
 function post(msg: Response): void {
   self.postMessage(msg);
@@ -46,6 +48,7 @@ async function open(file: File): Promise<void> {
   store = next;
   bookmarks.clear();
   expanded = new Uint8Array(store.length);
+  opened = [];
   rows = new Int32Array(0);
   post({ type: 'loaded', lines: store.length, counts: [...store.counts], ms: Math.round(performance.now() - started) });
 }
@@ -88,6 +91,12 @@ function rebuild(id: number): void {
   });
 }
 
+/** The opened range holding `line`, if it was revealed from a gap. */
+function openedRange(line: number): [number, number] | undefined {
+  if (expanded[line] !== 1) return undefined;
+  return opened.find(([s, e]) => line >= s && line < e);
+}
+
 function getRows(id: number, start: number, count: number): void {
   const out: Row[] = [];
   const end = Math.min(rows.length, start + count);
@@ -95,12 +104,46 @@ function getRows(id: number, start: number, count: number): void {
     const v = rows[r]!;
     if (isGap(v)) {
       const [s, e] = gapRange(rows, r, store.length);
-      out.push({ kind: 'gap', start: s, end: e });
+      const gap: Row = { kind: 'gap', start: s, end: e };
+      if (s > 0 && expanded[s - 1] === 1) gap.afterRevealed = true;
+      if (e < store.length && expanded[e] === 1) gap.beforeRevealed = true;
+      out.push(gap);
     } else {
-      out.push({ kind: 'line', line: v, text: store.text(v), level: store.level(v), bookmarked: bookmarks.has(v) });
+      const row: Row = { kind: 'line', line: v, text: store.text(v), level: store.level(v), bookmarked: bookmarks.has(v) };
+      const range = openedRange(v);
+      if (range) {
+        row.extra = true;
+        // The first row of the run carries the "hide again" control.
+        const prev = r > 0 ? rows[r - 1]! : -1;
+        if (prev < range[0]) {
+          let n = 0;
+          for (let i = range[0]; i < range[1]; i++) if (expanded[i] === 1) n++;
+          row.revealed = { start: range[0], end: range[1], count: n };
+        }
+      }
+      out.push(row);
     }
   }
   post({ type: 'rows', id, start, rows: out });
+}
+
+/** The lines on show, as a text file. Built in chunks so a huge view never needs one giant string. */
+function exportShown(id: number): void {
+  const parts: string[] = [];
+  let chunk: string[] = [];
+  let lines = 0;
+  for (let r = 0; r < rows.length; r++) {
+    const v = rows[r]!;
+    if (isGap(v)) continue;
+    chunk.push(store.text(v));
+    lines++;
+    if (chunk.length === 10_000) {
+      parts.push(chunk.join('\n') + '\n');
+      chunk = [];
+    }
+  }
+  if (chunk.length) parts.push(chunk.join('\n') + '\n');
+  post({ type: 'export', id, blob: new Blob(parts, { type: 'text/plain' }), lines });
 }
 
 /** An error line that starts an entry, not a stack frame continuing the one above. */
@@ -135,10 +178,19 @@ self.onmessage = (e: MessageEvent<Request>) => {
     case 'view':
       query = m.query;
       expanded.fill(0);
+      opened = [];
       rebuild(m.id);
       break;
     case 'expand':
-      expanded.fill(1, m.start, m.end);
+      // Ranges that touch or overlap become one block with one ⌄.
+      opened = mergeRange(opened, [m.start, m.end]);
+      for (const [s, e] of opened) expanded.fill(1, s, e);
+      rebuild(m.id);
+      break;
+    case 'collapse':
+      opened = opened.filter(([s, e]) => !(s === m.start && e === m.end));
+      expanded.fill(0, m.start, m.end);
+      for (const [s, e] of opened) expanded.fill(1, s, e);
       rebuild(m.id);
       break;
     case 'bookmark':
@@ -148,6 +200,9 @@ self.onmessage = (e: MessageEvent<Request>) => {
       break;
     case 'rows':
       getRows(m.id, m.start, m.count);
+      break;
+    case 'export':
+      exportShown(m.id);
       break;
     case 'find':
       find(m.id, m.fromRow, m.direction, m.target);

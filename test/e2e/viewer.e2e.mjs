@@ -1,4 +1,4 @@
-/* global chrome */
+/* global chrome, navigator, window, Buffer */
 // End-to-end check: loads the built extension (dist/) in Chromium, opens a
 // log and exercises search, filter, context, gap expansion, bookmarks and
 // error navigation. Run with `npm run e2e` after `npm run build`.
@@ -35,7 +35,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '3 matches');
   await page.waitForSelector('mark');
 
-  await page.click('#filter');
+  // Filter is on by default: only matches stay.
+  assert.equal(await page.getAttribute('#filter', 'aria-pressed'), 'true');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('5 rows'));
   await page.waitForFunction(() => document.querySelectorAll('.gap').length === 2);
 
@@ -45,10 +46,49 @@ try {
   await page.waitForSelector('.gap');
   await page.locator('.gap').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
+  // Revealed lines can be hidden again, back to the filtered view.
+  await page.waitForSelector('.row.revealed');
+  assert.match(await page.getAttribute('.row .fold', 'title'), /^Hide \d+ lines? again$/);
+  await page.click('.row .fold');
+  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
+  assert.equal(await page.locator('.row.revealed').count(), 0);
+  await page.locator('.gap').last().click();
+  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
 
   await page.locator('.row .gutter').first().click();
   await page.waitForSelector('.row.bookmarked');
   assert.equal(await page.textContent('#bookmark-status'), '1 bookmarked');
+  assert.equal(await page.isVisible('#bm-next'), true, 'bookmark stepping buttons appear');
+
+  // Copy shown: every visible line, revealed ones included, no gap rows.
+  // (Headless can't grant clipboard access to an extension page, so catch the write.)
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = async (t) => void (window.__copied = t);
+  });
+  await page.click('#copy-shown');
+  await page.waitForFunction(() => document.querySelector('#copy-shown').textContent.startsWith('Copied'));
+  assert.equal(await page.textContent('#copy-shown'), 'Copied 11 lines', '12 rows on screen, one of them a gap');
+  const copied = await page.evaluate(() => window.__copied);
+  assert.equal(copied.split('\n').filter(Boolean).length, 11);
+  assert.doesNotMatch(copied, /hidden/);
+  // Save as .log downloads the same lines.
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#save-shown')]);
+  assert.equal(download.suggestedFilename(), 'sample-shown.log');
+
+  // Save the search, then reuse it from the Highlights list in one click.
+  await page.click('#save-search');
+  await page.click('#rules-toggle');
+  await page.waitForSelector('.rule-filter');
+  await page.fill('#q', '');
+  await page.waitForFunction(() => document.querySelector('#match-count').textContent === '');
+  await page.click('.rule-filter');
+  assert.equal(await page.inputValue('#q'), 'timeout');
+  await page.waitForFunction(() => document.querySelector('#match-count').textContent === '3 matches');
+  assert.equal(await page.isHidden('#rules-panel'), true, 'the dropdown closes to show the results');
+  await page.click('#rules-toggle');
+  await page.click('.rule-remove');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isHidden('#rules-panel'), true);
 
   await page.click('#filter');
   await page.fill('#q', '');
@@ -59,7 +99,17 @@ try {
   assert.match(await page.textContent('.row.current'), /ERROR \[payments\]/);
 
   // Hiding warnings collapses them into a gap. (The DEBUG line stays: it is bookmarked.)
-  await page.click('.level[data-code="2"]');
+  // A plain click shows only that level; a second click shows all again.
+  await page.click('.level[data-code="1"]');
+  assert.equal(await page.locator('.level[aria-pressed="true"]').count(), 1);
+  // Only errors (and the bookmarked DEBUG line: bookmarks always show).
+  await page.waitForFunction(
+    () => document.querySelector('.row.lv1') && ![...document.querySelectorAll('.row')].some((r) => /INFO|WARN/.test(r.textContent)),
+  );
+  await page.click('.level[data-code="1"]');
+  await page.waitForFunction(() => document.querySelectorAll('.level[aria-pressed="false"]').length === 0);
+  // Ctrl+click hides just one level.
+  await page.click('.level[data-code="2"]', { modifiers: ['Control'] });
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('11 rows'));
   await page.waitForSelector('.gap');
   assert.equal(await page.locator('.row', { hasText: 'WARN' }).count(), 0);
@@ -71,12 +121,28 @@ try {
   await page.press('#rule-input', 'Enter');
   await page.waitForSelector('mark.hl0', { state: 'attached' });
   assert.equal(await page.textContent('#rules-toggle'), 'Highlights 1');
+  // Saved terms edit in place, and the color dot cycles colors.
+  await page.click('.rule-term');
+  await page.fill('.rule-edit', 'user_id=56');
+  await page.press('.rule-edit', 'Enter');
+  await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=56');
+  await page.click('.rule-term');
+  await page.fill('.rule-edit', 'user_id=42');
+  await page.press('.rule-edit', 'Enter');
+  await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=42');
+  await page.click('.rules .swatch');
+  await page.waitForSelector('.rules .swatch.hl1');
+  await page.click('.rules .swatch');
+  for (let i = 0; i < 4; i++) await page.click('.rules .swatch');
+  await page.waitForSelector('.rules .swatch.hl0');
   await page.reload();
   await page.setInputFiles('#file', sample);
   await page.waitForSelector('mark.hl0', { state: 'attached' });
   await page.click('#rules-toggle');
   await page.click('.rule-remove');
   await page.waitForFunction(() => !document.querySelector('mark.hl0'));
+  await page.click('#log');
+  assert.equal(await page.isHidden('#rules-panel'), true, 'a click on the log closes the dropdown');
 
   // Help menu: bug links carry the version and browser, never log content.
   await page.click('#help-toggle');
@@ -240,7 +306,7 @@ try {
   popup = await popupForTab(logUrl, 'text/plain');
   await popup.waitForSelector('#this-tab:not([hidden])');
   assert.equal(await popup.textContent('#tab-name'), 'remote.log');
-  assert.equal(await popup.getAttribute('#open-file', 'class'), 'tool-btn', 'the tab offer is the main action');
+  assert.equal(await popup.isHidden('#open-file'), true, 'on a text tab, opening that tab is the only action');
   await Promise.all([textTab.waitForURL(/viewer\.html\?src=/), popup.click('#open-tab').catch(() => {})]);
   await textTab.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('12 rows'));
   assert.equal(await textTab.textContent('#file-name'), 'remote.log');
@@ -275,15 +341,63 @@ try {
   }
   server.close();
 
-  // The popup carries the same switch, also off.
+  // Big gaps offer a few lines from either end instead of only "show all".
+  const big = ['needle start', ...Array.from({ length: 198 }, (_, i) => `filler ${i}`), 'needle end'].join('\n');
+  await page.goto(`chrome-extension://${id}/viewer.html`);
+  await page.setInputFiles('#file', { name: 'big.log', mimeType: 'text/plain', buffer: Buffer.from(big) });
+  await page.waitForSelector('#viewer:not([hidden])');
+  await page.fill('#q', 'needle');
+  await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('3 rows'));
+  const rowsAre = (n) => page.waitForFunction((n) => document.querySelector('#status').textContent.startsWith(`${n} rows`), n);
+  assert.match(await page.textContent('.gap.big'), /198 lines hidden/);
+  // Show more reveals 5 lines down from the line above, then keeps going down.
+  await page.click('.gap-act:has-text("↓ 5 more")');
+  await rowsAre(8);
+  await page.click('.gap-act:has-text("↓ 5 more")');
+  await rowsAre(13);
+  // The two steps joined into one block with one ⌄.
+  await page.waitForSelector('.row .fold[title="Hide 10 lines again"]');
+  assert.equal(await page.locator('.row .fold').count(), 1);
+  assert.equal(await page.getAttribute('.row .fold', 'title'), 'Hide 10 lines again');
+  await page.click('.row .fold');
+  await rowsAre(3);
+  // Clicking the row (the › arrow too) is "show more"; show all opens the rest.
+  await page.click('.gap.big .fold');
+  await rowsAre(8);
+  await page.click('.gap-act:has-text("show all")');
+  await rowsAre(200);
+  await page.waitForSelector('.row .fold[title="Hide 198 lines again"]');
+  assert.equal(await page.locator('.row .fold').count(), 1, 'the steps and the rest are one block');
+  // A gap at the top of the file grows up from the first line on show.
+  await page.fill('#q', 'needle end');
+  await rowsAre(2);
+  assert.equal(await page.locator('.gap-act:has-text("↓ 5 more")').count(), 0, 'nothing above the first line to grow down from');
+  await page.click('.gap-act:has-text("↑ 5 more")');
+  await rowsAre(7);
+  await page.waitForSelector('.row.revealed');
+  assert.equal(await page.textContent('.row.revealed .text'), 'filler 193');
+  await page.click('.gap-act:has-text("↑ 5 more")');
+  await rowsAre(12);
+
+  // Auto-open is on by default (this test browser already allows file access,
+  // so no setup step shows; that path is unit tested). It can be turned off.
   popup = await openPopup();
-  await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn off');
   assert.match(await popup.textContent('#auto-open-title'), /Always open \.log files/);
+  assert.match(await popup.textContent('#auto-open-status'), /^On\./);
+  // The same switch covers websites, after one Allow click (all-sites access isn't asked at install).
+  await popup.waitForSelector('#auto-open-web:not([hidden])');
+  await popup.click('#auto-open-btn');
+  await popup.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  await popup.waitForSelector('#auto-open-web', { state: 'hidden' });
+  assert.equal(await popup.isHidden('#file-access-step'), true);
   await popup.close();
 
-  // The auto-open card starts switched off.
+  // The start screen's card shares the setting.
   await page.goto(`chrome-extension://${id}/viewer.html`);
   await page.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn on');
+  await page.click('#auto-open-btn');
+  await page.waitForFunction(() => document.querySelector('#auto-open-btn')?.textContent === 'Turn off');
 
   assert.deepEqual(errors, []);
   console.log('e2e: all checks passed');

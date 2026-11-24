@@ -7,7 +7,7 @@ import {
   type RecentLog,
 } from '../core/recent';
 import { accessStep, originPattern, tabOffer, type PendingOpen, type TabOffer } from '../core/currentTab';
-import { setupAutoOpen } from '../viewer/sources';
+import { setupAutoOpen, setupAutoOpenWeb } from '../viewer/sources';
 import { setupTheme } from '../viewer/theme';
 
 // First, so the popup paints in the right theme.
@@ -149,7 +149,8 @@ async function offerActiveTab(): Promise<void> {
   const tabId = tab.id;
   $('tab-name').textContent = offer.name;
   $('tab-from').textContent = offer.local ? 'on this computer' : `from ${new URL(offer.url).host}`;
-  $('open-file').classList.remove('primary');
+  // On a text tab that is the one thing to do; the other ways in are for when no log is open.
+  document.querySelector<HTMLElement>('.popup-actions')!.hidden = true;
   $('this-tab').hidden = false;
   $('open-tab').addEventListener('click', () => void openTab(tabId, offer));
   $('tab-step-btn').addEventListener('click', () => {
@@ -160,3 +161,4 @@ async function offerActiveTab(): Promise<void> {
 
 void offerActiveTab();
 void setupAutoOpen();
+void setupAutoOpenWeb();

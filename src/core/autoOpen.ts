@@ -12,6 +12,32 @@ export function shouldAutoOpen(url: string): boolean {
   return u.protocol === 'file:' && LOG_NAME.test(decodeURIComponent(u.pathname));
 }
 
+/**
+ * Whether a web tab URL looks like a log worth checking for auto-open. The
+ * name is only a first filter: the page must also turn out to be plain text.
+ */
+export function shouldAutoOpenWeb(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  return (u.protocol === 'https:' || u.protocol === 'http:') && LOG_NAME.test(decodeURIComponent(u.pathname));
+}
+
+/** Web origins auto-open needs for .log links on websites: every site, asked for with one click in the popup. */
+export const WEB_ORIGINS = ['https://*/*', 'http://*/*'];
+
+/**
+ * Whether to send this tab to the viewer, given the URL it last left for the
+ * viewer. Without this, Back from the viewer would land on the log and be
+ * sent straight back: a trap.
+ */
+export function isReturnVisit(url: string, lastRedirected: unknown): boolean {
+  return typeof lastRedirected === 'string' && lastRedirected === url;
+}
+
 /** The URLs the viewer may load from its `?src=` parameter. */
 export function isLoadableSource(url: string): boolean {
   try {
@@ -32,51 +58,47 @@ export function fileNameFromUrl(url: string): string {
 }
 
 export interface AutoOpenFacts {
-  /** The user asked for auto-open (saved setting). */
+  /** The user wants auto-open. On unless they turned it off (saved `autoOpen: false`). */
   wanted: boolean;
-  /** Chrome granted the optional file:///* host permission. */
+  /** The file:///* host permission is granted (it is asked for at install). */
   hasPermission: boolean;
-  /** "Allow access to file URLs" is on for the extension. */
+  /** "Allow access to file URLs" is on for the extension. Only the user can turn it on. */
   fileAccess: boolean;
-  /** The user clicked "Turn on" while file access was still off. */
-  needsFileAccess: boolean;
 }
 
 export interface AutoOpenView {
   on: boolean;
-  button: 'Turn on' | 'Turn off';
+  /** What the button does: turn the setting on or off, or ask Chrome for file:///* again. */
+  button: 'Turn on' | 'Turn off' | 'Allow';
   status: string;
   /** Show the "Allow access to file URLs" step. */
   showStep: boolean;
 }
 
 /**
- * What the auto-open card shows. Chrome refuses to grant file:///* (it throws)
- * until "Allow access to file URLs" is on, so that toggle is the first step,
- * not the last.
+ * What the auto-open switch shows. It is on by default, but Chrome keeps
+ * "Allow access to file URLs" off for every extension until the user flips
+ * it, so until then the switch shows that one setup step.
  */
 export function autoOpenView(f: AutoOpenFacts): AutoOpenView {
-  const on = f.wanted && f.hasPermission && f.fileAccess;
-  if (on) {
-    return {
-      on,
-      button: 'Turn off',
-      status: 'On. Local .log files you open in Chrome open in Grepsy.',
-      showStep: false,
-    };
+  if (!f.wanted) {
+    return { on: false, button: 'Turn on', status: 'Off. .log files open as plain text.', showStep: false };
   }
-  if (!f.fileAccess && (f.needsFileAccess || f.wanted)) {
+  if (!f.fileAccess) {
     return {
-      on,
-      button: 'Turn on',
-      status: 'First, let Grepsy read local files. Then open Grepsy again and click Turn on.',
+      on: false,
+      button: 'Turn off',
+      status: 'One step left: let Grepsy read files on this computer.',
       showStep: true,
     };
   }
-  return {
-    on,
-    button: 'Turn on',
-    status: 'Local .log files you open in Chrome open in Grepsy.',
-    showStep: false,
-  };
+  if (!f.hasPermission) {
+    return { on: false, button: 'Allow', status: 'Grepsy needs your OK to read local files.', showStep: false };
+  }
+  return { on: true, button: 'Turn off', status: 'On. .log files you open in Chrome open in Grepsy.', showStep: false };
+}
+
+/** The saved setting: auto-open is on unless the user turned it off. */
+export function autoOpenWanted(saved: unknown): boolean {
+  return saved !== false;
 }

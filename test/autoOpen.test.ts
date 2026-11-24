@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { autoOpenView, fileNameFromUrl, isLoadableSource, shouldAutoOpen } from '../src/core/autoOpen';
+import { isReturnVisit, shouldAutoOpenWeb } from '../src/core/autoOpen';
+import { autoOpenView, autoOpenWanted, fileNameFromUrl, isLoadableSource, shouldAutoOpen } from '../src/core/autoOpen';
 
 describe('shouldAutoOpen', () => {
   it.each([
@@ -41,30 +42,53 @@ describe('fileNameFromUrl', () => {
 });
 
 describe('autoOpenView', () => {
-  const off = { wanted: false, hasPermission: false, fileAccess: false, needsFileAccess: false };
+  const ready = { wanted: true, hasPermission: true, fileAccess: true };
 
-  it('starts off with no step', () => {
-    expect(autoOpenView(off)).toMatchObject({ on: false, button: 'Turn on', showStep: false });
+  it('is on by default once Chrome lets Grepsy read local files', () => {
+    expect(autoOpenView(ready)).toMatchObject({ on: true, button: 'Turn off', showStep: false });
   });
 
-  it('asks for file access first when Turn on is clicked without it', () => {
-    const v = autoOpenView({ ...off, needsFileAccess: true });
-    expect(v).toMatchObject({ on: false, button: 'Turn on', showStep: true });
-    expect(v.status).toMatch(/First/);
+  it('shows the file access step until the user turns it on', () => {
+    const v = autoOpenView({ ...ready, fileAccess: false });
+    expect(v).toMatchObject({ on: false, button: 'Turn off', showStep: true });
+    expect(v.status).toMatch(/One step left/);
   });
 
-  it('is on only with the setting, the permission and file access', () => {
-    expect(autoOpenView({ wanted: true, hasPermission: true, fileAccess: true, needsFileAccess: false }))
-      .toMatchObject({ on: true, button: 'Turn off', showStep: false });
+  it('stays off, with no step, when the user turned it off', () => {
+    expect(autoOpenView({ ...ready, wanted: false })).toMatchObject({ on: false, button: 'Turn on', showStep: false });
+    expect(autoOpenView({ ...ready, wanted: false, fileAccess: false }).showStep).toBe(false);
   });
 
-  it('shows the step again if file access is switched off later', () => {
-    expect(autoOpenView({ wanted: true, hasPermission: true, fileAccess: false, needsFileAccess: false }))
-      .toMatchObject({ on: false, showStep: true });
+  it('asks again if the file permission was removed', () => {
+    expect(autoOpenView({ ...ready, hasPermission: false })).toMatchObject({ on: false, button: 'Allow' });
   });
+});
 
-  it('hides the step once file access is on, ready for Turn on', () => {
-    expect(autoOpenView({ ...off, fileAccess: true, needsFileAccess: true }))
-      .toMatchObject({ on: false, button: 'Turn on', showStep: false });
+describe('autoOpenWanted', () => {
+  it('defaults to on', () => {
+    expect(autoOpenWanted(undefined)).toBe(true);
+    expect(autoOpenWanted(true)).toBe(true);
+    expect(autoOpenWanted(false)).toBe(false);
+  });
+});
+
+describe('shouldAutoOpenWeb', () => {
+  it('takes log-named web links', () => {
+    expect(shouldAutoOpenWeb('https://raw.githubusercontent.com/logpai/loghub/refs/heads/master/Hadoop/Hadoop_2k.log')).toBe(true);
+    expect(shouldAutoOpenWeb('http://ci.local/build/42/output.out?raw=1')).toBe(true);
+  });
+  it('skips pages and local files', () => {
+    expect(shouldAutoOpenWeb('https://github.com/logpai/loghub/blob/master/Hadoop/README.md')).toBe(false);
+    expect(shouldAutoOpenWeb('https://example.com/')).toBe(false);
+    expect(shouldAutoOpenWeb('file:///var/log/app.log')).toBe(false);
+    expect(shouldAutoOpenWeb('not a url')).toBe(false);
+  });
+});
+
+describe('isReturnVisit', () => {
+  it('lets Back from the viewer land on the log', () => {
+    expect(isReturnVisit('https://x.dev/a.log', 'https://x.dev/a.log')).toBe(true);
+    expect(isReturnVisit('https://x.dev/b.log', 'https://x.dev/a.log')).toBe(false);
+    expect(isReturnVisit('https://x.dev/a.log', undefined)).toBe(false);
   });
 });

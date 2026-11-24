@@ -2,12 +2,16 @@ import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
 import { extractJson, mayContainJson } from '../core/json';
 import { LEVEL_COUNT } from '../core/lineStore';
+import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
+import { GAP_SMALL, GAP_STEP, gapStep } from '../core/view';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
+import { fileNameFromUrl } from '../core/autoOpen';
 import { rememberRecent } from '../core/recent';
+import { VIEW_HEARTBEAT_MS, VIEW_KEY_PREFIX } from '../core/restore';
 import { NetworkFailure, fetchAsFile, hasAccess, setupAutoOpen } from './sources';
 import { setupTheme } from './theme';
 
@@ -52,13 +56,30 @@ const state = {
   requested: '',
   current: -1,
   highlight: null as RegExp | null,
-  query: { text: '', caseSensitive: false, regex: false, filter: false, context: 0, levels: [] } as ViewQuery,
+  query: { text: '', caseSensitive: false, regex: false, filter: true, context: 0, levels: [] } as ViewQuery,
 };
 
 // ---- Opening a file ------------------------------------------------------
 
+const loading = $('loading');
+const loadingBar = $('loading-bar');
+/** Swaps the start screen for the loading mark while a log downloads or is read. */
+function showLoading(title: string, detail = ''): void {
+  startScreen.hidden = true;
+  loading.hidden = false;
+  $('loading-title').textContent = title;
+  $('loading-detail').textContent = detail;
+  loadingBar.style.width = '0';
+}
+/** Back to the start screen, e.g. after a failed download (its message is in #progress). */
+function showStart(): void {
+  loading.hidden = true;
+  startScreen.hidden = false;
+}
+
 function open(file: File): void {
   progress.textContent = `Reading ${file.name}…`;
+  showLoading(`Opening ${file.name}`);
   fileName.textContent = file.name;
   fileName.title = file.name;
   document.title = `${file.name} · Grepsy`;
@@ -105,6 +126,20 @@ $('home').addEventListener('click', () => {
   location.href = 'viewer.html';
 });
 
+// Chrome closes this tab if Grepsy reloads or updates; a fresh note lets the
+// background script reopen the log afterwards (see core/restore.ts).
+const noteKey = `${VIEW_KEY_PREFIX}${crypto.randomUUID()}`;
+let noteTimer = 0;
+function keepOpenNote(src: string): void {
+  const write = () => void chrome.storage.local.set({ [noteKey]: { src, seen: Date.now() } });
+  write();
+  clearInterval(noteTimer);
+  noteTimer = window.setInterval(write, VIEW_HEARTBEAT_MS);
+}
+// Not removed on pagehide: Chrome fires it when it closes the tab for an
+// update too, which is exactly when the note is needed. A closed tab's note
+// simply goes stale.
+
 // Opening by URL: the "Open a URL" box, or ?src= when the background
 // script redirected a file:// log tab here.
 const urlBox = $<HTMLFormElement>('url-box');
@@ -113,11 +148,14 @@ const urlInput = $<HTMLInputElement>('url-input');
 async function openUrl(url: string, askForAccess: boolean): Promise<'ok' | 'network' | 'failed'> {
   progress.classList.remove('error');
   progress.textContent = `Downloading ${url}…`;
+  showLoading(`Downloading ${fileNameFromUrl(url)}`, new URL(url).protocol === 'file:' ? 'from this computer' : `from ${new URL(url).host}`);
   try {
     open(await fetchAsFile(url, askForAccess));
     void rememberRecent(chrome.storage.local, url);
+    keepOpenNote(url);
     return 'ok';
   } catch (err) {
+    showStart();
     progress.classList.add('error');
     progress.textContent = (err as Error).message;
     return err instanceof NetworkFailure ? 'network' : 'failed';
@@ -148,6 +186,7 @@ if (src) {
     progress.textContent = `Click Open to let Grepsy read from ${new URL(src).host}.`;
   });
 }
+if (!src) startScreen.hidden = false;
 if (params.has('paste')) $('paste-btn').click();
 void setupAutoOpen();
 
@@ -159,6 +198,8 @@ worker.onmessage = (e: MessageEvent<Response>) => {
     case 'progress': {
       const pct = m.totalBytes ? Math.min(99, Math.round((m.bytes / m.totalBytes) * 100)) : 0;
       progress.textContent = `Reading… ${m.lines.toLocaleString()} lines (${pct}%)`;
+      loadingBar.style.width = `${pct}%`;
+      $('loading-detail').textContent = `${m.lines.toLocaleString()} lines · ${pct}%`;
       break;
     }
     case 'loaded':
@@ -166,6 +207,7 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       state.loadMs = m.ms;
       buildLevelButtons(m.counts);
       startScreen.hidden = true;
+      loading.hidden = true;
       viewer.hidden = false;
       requestView();
       log.focus();
@@ -178,8 +220,9 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       state.requested = '';
       searchBox.classList.toggle('invalid', m.error !== null);
       searchBox.title = m.error ?? '';
-      matchCount.textContent = state.query.text && !m.error ? `${m.matches.toLocaleString()} matches` : '';
+      matchCount.textContent = state.query.text && !m.error ? `${m.matches.toLocaleString()} ${m.matches === 1 ? "match" : "matches"}` : '';
       bookmarkStatus.textContent = m.bookmarks ? `${m.bookmarks} bookmarked` : '';
+      $('bookmark-nav').hidden = m.bookmarks === 0;
       status.textContent =
         `${m.rowCount.toLocaleString()} rows · ${state.lines.toLocaleString()} lines · read in ${state.loadMs.toLocaleString()} ms`;
       render();
@@ -188,6 +231,9 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       if (m.id !== state.viewId) return;
       m.rows.forEach((r, i) => state.cache.set(m.start + i, r));
       render();
+      break;
+    case 'export':
+      void finishExport(m.blob, m.lines);
       break;
     case 'found':
       if (m.id !== state.viewId || m.row === null) return;
@@ -248,7 +294,11 @@ function draw(): void {
 
 function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement {
   const div = document.createElement('div');
-  div.className = `row lv${row.level}` + (row.bookmarked ? ' bookmarked' : '') + (index === state.current ? ' current' : '');
+  div.className =
+    `row lv${row.level}` +
+    (row.bookmarked ? ' bookmarked' : '') +
+    (row.extra ? ' revealed' : '') +
+    (index === state.current ? ' current' : '');
   const gutter = document.createElement('button');
   gutter.type = 'button';
   gutter.className = 'gutter';
@@ -274,6 +324,22 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
     }
   }
   div.append(gutter, text);
+  if (row.revealed) {
+    const { start, end, count } = row.revealed;
+    // A fold arrow, like a code editor's: ⌄ on an opened run folds it back.
+    const fold = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'fold';
+    fold.textContent = '⌄';
+    const label = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'} again`;
+    fold.title = label;
+    fold.setAttribute('aria-label', label);
+    fold.addEventListener('click', () => {
+      state.viewId++;
+      send({ type: 'collapse', id: state.viewId, start, end });
+    });
+    div.prepend(fold);
+  }
   if (mayContainJson(row.text)) {
     const found = extractJson(row.text);
     if (found) {
@@ -297,22 +363,65 @@ function patterns(): Pattern[] {
 
 function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   const n = row.end - row.start;
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'gap';
+  const expand = ([start, end]: [number, number]) => {
+    state.viewId++;
+    send({ type: 'expand', id: state.viewId, start, end });
+  };
+  const fold = document.createElement('span');
+  fold.className = 'fold';
+  fold.setAttribute('aria-hidden', 'true');
+  fold.textContent = '›';
   const g = document.createElement('span');
   g.className = 'gutter';
   g.textContent = '⋯';
   const label = document.createElement('span');
-  label.textContent = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden, click to show`;
   const line = document.createElement('span');
   line.className = 'line';
-  btn.append(g, label, line);
-  btn.addEventListener('click', () => {
-    state.viewId++;
-    send({ type: 'expand', id: state.viewId, start: row.start, end: row.end });
-  });
-  return btn;
+  const hidden = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden`;
+
+  if (n <= GAP_SMALL) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gap';
+    label.textContent = `${hidden}, click to show`;
+    btn.append(fold, g, label, line);
+    btn.addEventListener('click', () => expand([row.start, row.end]));
+    return btn;
+  }
+  // A big gap stays one bar: it shrinks from either edge as lines are
+  // revealed, and goes away once it is empty, so revealed blocks join up.
+  const div = document.createElement('div');
+  div.className = 'gap big';
+  label.textContent = `${hidden}:`;
+  const act = (text: string, title: string, range: [number, number]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gap-act';
+    b.textContent = text;
+    b.title = title;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      expand(range);
+    });
+    return b;
+  };
+  const acts: HTMLElement[] = [];
+  // ↑ grows the lines below the gap upwards; ↓ grows the lines above downwards.
+  // Neither is offered at the edge of the file, where there is nothing to grow.
+  if (row.end < state.lines) {
+    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
+  }
+  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
+  if (row.start > 0) {
+    acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
+  }
+  // Anywhere else on the row (the › arrow, the text) shows more next to
+  // the block you are already opening.
+  const step = gapStep(row);
+  div.title = `Show ${GAP_STEP} more lines`;
+  div.addEventListener('click', () => expand(step));
+  div.append(fold, g, label, ...acts, line);
+  return div;
 }
 
 function scrollToRow(row: number): void {
@@ -340,22 +449,25 @@ function buildLevelButtons(counts: number[]): void {
     b.className = 'level';
     b.dataset.code = String(code);
     b.setAttribute('aria-pressed', 'true');
-    b.title = `Show or hide ${LEVEL_LABELS[code]!.toLowerCase()}`;
+    b.title = `Show only ${LEVEL_LABELS[code]!.toLowerCase()} (click again for all; Ctrl+click to add or remove)`;
     b.append(LEVEL_LABELS[code]!);
     const n = document.createElement('span');
     n.className = 'n';
     n.textContent = count.toLocaleString();
     b.append(n);
-    b.addEventListener('click', () => {
-      const pressed = b.getAttribute('aria-pressed') === 'true';
-      b.setAttribute('aria-pressed', String(!pressed));
-      state.query.levels = pressed ? state.query.levels.filter((c) => c !== code) : [...state.query.levels, code];
+    b.addEventListener('click', (e) => {
+      state.query.levels = nextLevels(state.query.levels, allLevels, code, e.ctrlKey || e.metaKey);
+      for (const other of levelsBar.querySelectorAll<HTMLButtonElement>('.level')) {
+        other.setAttribute('aria-pressed', String(state.query.levels.includes(Number(other.dataset.code))));
+      }
       requestView();
     });
     levelsBar.append(b);
   }
   state.query.levels = on;
+  allLevels = [...on];
 }
+let allLevels: number[] = [];
 
 function toggle(btn: HTMLButtonElement, apply: (on: boolean) => void): void {
   btn.addEventListener('click', () => {
@@ -442,19 +554,42 @@ function drawRules(): void {
   rulesList.replaceChildren(
     ...ruleStore.rules.map((r, i) => {
       const li = document.createElement('li');
-      const sw = document.createElement('span');
+      // The color dot cycles colors; the term edits in place on click.
+      const sw = document.createElement('button');
+      sw.type = 'button';
       sw.className = `swatch hl${r.color}`;
-      const term = document.createElement('span');
+      sw.title = 'Change color';
+      sw.setAttribute('aria-label', `Change color of ${r.term}`);
+      sw.addEventListener('click', () => ruleStore.nextColor(i));
+      const term = document.createElement('button');
+      term.type = 'button';
       term.className = 'rule-term';
       term.textContent = r.term;
-      term.title = r.term;
+      term.title = 'Click to edit';
+      term.addEventListener('click', () => editRule(i, term));
       const rm = document.createElement('button');
       rm.type = 'button';
       rm.className = 'rule-remove';
       rm.textContent = '×';
       rm.setAttribute('aria-label', `Remove highlight ${r.term}`);
       rm.addEventListener('click', () => ruleStore.remove(i));
-      li.append(sw, term, rm);
+      const filterBtnEl = document.createElement('button');
+      filterBtnEl.type = 'button';
+      filterBtnEl.className = 'rule-filter';
+      filterBtnEl.textContent = 'Filter';
+      filterBtnEl.title = `Show only lines matching ${r.term}`;
+      filterBtnEl.addEventListener('click', () => {
+        setRulesOpen(false);
+        applySearch(r.term, r.regex === true);
+      });
+      if (r.regex) {
+        const re = document.createElement('span');
+        re.className = 'rule-re';
+        re.textContent = '.*';
+        re.title = 'Regular expression';
+        term.after(re);
+      }
+      li.append(sw, term, filterBtnEl, rm);
       return li;
     }),
   );
@@ -462,20 +597,137 @@ function drawRules(): void {
   render();
 }
 
+/** Swaps a saved term for a text box; Enter or leaving it saves, Escape cancels. */
+function editRule(index: number, term: HTMLElement): void {
+  const rule = ruleStore.rules[index];
+  if (!rule) return;
+  const input = document.createElement('input');
+  input.className = 'rule-edit';
+  input.value = rule.term;
+  input.setAttribute('aria-label', 'Edit highlight');
+  input.spellcheck = false;
+  let done = false;
+  const finish = (save: boolean) => {
+    if (done) return;
+    done = true;
+    if (save && input.value !== rule.term && ruleStore.edit(index, input.value)) return; // redrawn by onChange
+    drawRules();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish(true);
+    else if (e.key === 'Escape') {
+      e.stopPropagation(); // keep the dropdown open
+      finish(false);
+    }
+  });
+  input.addEventListener('blur', () => finish(true));
+  term.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
 ruleStore.onChange(drawRules);
 void ruleStore.load();
 
-rulesToggle.addEventListener('click', () => {
-  const open = rulesPanel.hidden;
+function setRulesOpen(open: boolean): void {
   rulesPanel.hidden = !open;
-  rulesToggle.setAttribute('aria-pressed', String(open));
+  rulesToggle.setAttribute('aria-expanded', String(open));
   if (open) ruleInput.focus();
-  render();
+}
+rulesToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setRulesOpen(rulesPanel.hidden);
+});
+// Closes on a click elsewhere or Escape, like the help menu.
+document.addEventListener('click', (e) => {
+  // composedPath, not contains: a click can replace its own target (editing a term).
+  if (!rulesPanel.hidden && !e.composedPath().includes(rulesPanel)) setRulesOpen(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !rulesPanel.hidden) {
+    setRulesOpen(false);
+    rulesToggle.focus();
+  }
 });
 ruleForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (ruleStore.add(ruleInput.value)) ruleInput.value = '';
 });
+
+/** Puts `text` in the search box and filters by it, as if typed. */
+function applySearch(text: string, regex: boolean): void {
+  search.value = text;
+  state.query.text = text;
+  state.query.regex = regex;
+  regexBtn.setAttribute('aria-pressed', String(regex));
+  state.query.filter = true;
+  filterBtn.setAttribute('aria-pressed', 'true');
+  ctxGroup.hidden = false;
+  state.current = -1;
+  saveSearchBtn.disabled = !text.trim();
+  requestView();
+}
+
+// Save: the current search joins the Highlights list, ready to reuse.
+const saveSearchBtn = $<HTMLButtonElement>('save-search');
+saveSearchBtn.addEventListener('click', () => {
+  if (ruleStore.add(search.value, state.query.regex)) {
+    saveSearchBtn.textContent = '★';
+    setTimeout(() => (saveSearchBtn.textContent = '☆'), 1200);
+  }
+});
+search.addEventListener('input', () => (saveSearchBtn.disabled = !search.value.trim()));
+
+// ---- Bookmarks, copy and save ----------------------------------------------
+
+$('bm-prev').addEventListener('click', () => findNext('bookmark', -1));
+$('bm-next').addEventListener('click', () => findNext('bookmark', 1));
+
+let exportMode: 'copy' | 'save' = 'copy';
+const copyBtn = $<HTMLButtonElement>('copy-shown');
+const saveBtn = $<HTMLButtonElement>('save-shown');
+/** The clipboard copes badly with very large text; past this, suggest saving instead. */
+const COPY_LIMIT_BYTES = 50 * 1024 * 1024;
+
+function flash(btn: HTMLButtonElement, text: string): void {
+  const was = btn.dataset.label ?? btn.textContent ?? '';
+  btn.dataset.label = was;
+  btn.textContent = text;
+  setTimeout(() => (btn.textContent = was), 1500);
+}
+
+copyBtn.addEventListener('click', () => {
+  exportMode = 'copy';
+  send({ type: 'export', id: state.viewId });
+});
+saveBtn.addEventListener('click', () => {
+  exportMode = 'save';
+  send({ type: 'export', id: state.viewId });
+});
+
+async function finishExport(blob: Blob, lines: number): Promise<void> {
+  const count = `${lines.toLocaleString()} ${lines === 1 ? 'line' : 'lines'}`;
+  if (exportMode === 'save') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const base = fileName.textContent?.replace(/(\.log)?(\.gz)?$/i, '') || 'log';
+    a.download = `${base}-shown.log`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    flash(saveBtn, `Saved ${count}`);
+    return;
+  }
+  if (blob.size > COPY_LIMIT_BYTES) {
+    flash(copyBtn, 'Too big to copy, use Save');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(await blob.text());
+    flash(copyBtn, `Copied ${count}`);
+  } catch {
+    flash(copyBtn, 'Copy failed, use Save');
+  }
+}
 
 // ---- Help -----------------------------------------------------------------
 

@@ -27,6 +27,22 @@ describe('compileQuery', () => {
     expect(compileQuery({ ...opts, regex: true, text: '(' }).kind).toBe('error');
   });
 
+  it('keeps spaces in a plain search, so a leading space means "starts a word"', () => {
+    const q = compileQuery({ ...opts, text: ' steps' });
+    if (q.kind !== 'ok') throw new Error('expected ok');
+    expect(q.test.test('Test Steps:')).toBe(true);
+    expect(q.test.test('diagnosticSteps = []')).toBe(false);
+    expect(q.highlight.exec('Test Steps:')?.[0]).toBe(' Steps');
+    expect(compileQuery({ ...opts, text: '   ' }).kind).toBe('empty');
+  });
+
+  it('keeps whitespace in a regex search', () => {
+    const q = compileQuery({ ...opts, regex: true, text: ' steps' });
+    if (q.kind !== 'ok') throw new Error('expected ok');
+    expect(q.test.test('xsteps')).toBe(false);
+    expect(q.test.test('a steps')).toBe(true);
+  });
+
   it('rejects patterns that match empty text', () => {
     expect(compileQuery({ ...opts, regex: true, text: 'a*' }).kind).toBe('error');
   });

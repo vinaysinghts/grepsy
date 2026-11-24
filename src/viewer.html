@@ -7,7 +7,20 @@
   <link rel="stylesheet" href="./viewer/styles.css">
 </head>
 <body>
-  <main class="start" id="start">
+  <!-- Shown while a log downloads or is read. The start screen stays hidden
+       until the script knows there is nothing to open, so it never flashes. -->
+  <div class="loading" id="loading" hidden role="status" aria-live="polite">
+    <svg class="loading-mark" width="72" height="72" viewBox="0 0 128 128" aria-hidden="true">
+      <g fill="none" stroke-linecap="round">
+        <path class="ln ln1" d="M28 38h52"/><path class="ln ln2" d="M28 64h72"/><path class="ln ln3" d="M28 90h28"/>
+        <g class="lens"><circle cx="84" cy="88" r="14" stroke-width="9"/><path d="M95 99l9 9" stroke-width="9"/></g>
+      </g>
+    </svg>
+    <p class="loading-title" id="loading-title">Opening…</p>
+    <div class="loading-bar"><span id="loading-bar"></span></div>
+    <p class="muted loading-detail" id="loading-detail"></p>
+  </div>
+  <main class="start" id="start" hidden>
     <div class="start-head"><div class="brand"><span class="logo" aria-hidden="true"></span>Grepsy</div><button type="button" class="tool-btn icon" data-theme-toggle><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg></button></div>
     <h1>Open a log</h1>
     <p class="muted">Filter, highlight and jump between errors in files with millions of lines. Files stay on your computer and are never uploaded.</p>
@@ -53,19 +66,29 @@
         <label for="q" class="sr-only">Search the log</label>
         <input id="q" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
         <span class="match-count" id="match-count" aria-live="polite"></span>
-        <button type="button" class="tog" id="filter" aria-pressed="false" title="Hide lines that don't match">Filter</button>
-        <span class="ctx" id="ctx" hidden title="Lines of context around each match">
-          <span class="muted">context</span>
-          <button type="button" class="tog" data-ctx="0" aria-pressed="true">0</button>
+        <button type="button" class="tog" id="filter" aria-pressed="true" title="Hide lines that don't match (on by default)">Filter</button>
+        <span class="ctx" id="ctx" title="Lines of context to show around each match" role="group" aria-label="Context lines">
+          <button type="button" class="tog" data-ctx="0" aria-pressed="true">±0</button>
           <button type="button" class="tog" data-ctx="2" aria-pressed="false">±2</button>
           <button type="button" class="tog" data-ctx="5" aria-pressed="false">±5</button>
         </span>
         <button type="button" class="tog mono" id="case" aria-pressed="false" aria-label="Match case" title="Match case">Aa</button>
         <button type="button" class="tog mono" id="regex" aria-pressed="false" aria-label="Regular expression" title="Regular expression">.*</button>
+        <button type="button" class="tog" id="save-search" title="Save this search to Highlights, to reuse in one click" aria-label="Save search" disabled>☆</button>
       </div>
       <div class="levels" id="levels"></div>
       <span class="grow"></span>
-      <button type="button" class="tool-btn" id="rules-toggle" aria-pressed="false" aria-controls="rules-panel">Highlights</button>
+      <div class="menu-wrap">
+        <button type="button" class="tool-btn" id="rules-toggle" aria-expanded="false" aria-controls="rules-panel">Highlights</button>
+        <div class="rules dropdown" id="rules-panel" hidden aria-label="Highlights and saved searches">
+          <ul id="rules-list"></ul>
+          <form id="rule-form" class="rule-form">
+            <label for="rule-input" class="sr-only">Text to highlight</label>
+            <input id="rule-input" placeholder="+ Add highlight" autocomplete="off" spellcheck="false" maxlength="200">
+          </form>
+          <p class="muted rules-note">Saved terms are highlighted in every log. <b>Filter</b> shows only the lines that match one.</p>
+        </div>
+      </div>
       <button type="button" class="tool-btn icon" data-theme-toggle><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"></path></svg></button>
       <div class="menu-wrap">
         <button type="button" class="tool-btn icon" id="help-toggle" aria-expanded="false" aria-controls="help-menu" aria-label="Help and feedback">?</button>
@@ -84,19 +107,17 @@
         <div class="spacer" id="spacer"></div>
         <div class="rows" id="rows"></div>
       </div>
-      <aside class="rules" id="rules-panel" hidden aria-label="Highlight rules">
-        <ul id="rules-list"></ul>
-        <form id="rule-form" class="rule-form">
-          <label for="rule-input" class="sr-only">Text to highlight</label>
-          <input id="rule-input" placeholder="+ Add highlight" autocomplete="off" spellcheck="false" maxlength="200">
-        </form>
-        <p class="muted rules-note">Highlights are saved and apply to every log you open.</p>
-      </aside>
     </div>
     <footer class="status">
       <span id="status"></span>
       <span class="grow"></span>
-      <span id="bookmark-status"></span>
+      <span class="bm-nav" id="bookmark-nav" hidden>
+        <button type="button" class="link-btn" id="bm-prev" title="Previous bookmark (Shift+F2)" aria-label="Previous bookmark">‹</button>
+        <span id="bookmark-status"></span>
+        <button type="button" class="link-btn" id="bm-next" title="Next bookmark (F2)" aria-label="Next bookmark">›</button>
+      </span>
+      <button type="button" class="link-btn" id="copy-shown" title="Copy every line shown, including lines you expanded">Copy shown</button>
+      <button type="button" class="link-btn" id="save-shown" title="Save every line shown as a .log file">Save as .log</button>
       <span>Enter match · N error · F2 bookmark · ? help</span>
     </footer>
   </div>
@@ -108,6 +129,8 @@
       <dt><kbd>N</kbd> / <kbd>Shift</kbd>+<kbd>N</kbd></dt><dd>Next / previous error</dd>
       <dt><kbd>F2</kbd> / <kbd>Shift</kbd>+<kbd>F2</kbd></dt><dd>Next / previous bookmark</dd>
       <dt>Click a line number</dt><dd>Bookmark the line</dd>
+      <dt>Click a level</dt><dd>Show only that level (click again for all)</dd>
+      <dt><kbd>Ctrl</kbd>+click a level</dt><dd>Add or remove that level</dd>
       <dt><kbd>Esc</kbd></dt><dd>Leave the search box or close menus</dd>
     </dl>
     <form method="dialog"><button class="tool-btn">Close</button></form>

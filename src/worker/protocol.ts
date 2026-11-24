@@ -14,17 +14,42 @@ export type Request =
   | { type: 'open'; file: File }
   | { type: 'view'; id: number; query: ViewQuery }
   | { type: 'expand'; id: number; start: number; end: number }
+  | { type: 'collapse'; id: number; start: number; end: number }
+  | { type: 'export'; id: number }
   | { type: 'bookmark'; id: number; line: number }
   | { type: 'rows'; id: number; start: number; count: number }
   | { type: 'find'; id: number; fromRow: number; direction: 1 | -1; target: 'match' | 'error' | 'bookmark' };
 
 export type Row =
-  | { kind: 'line'; line: number; text: string; level: number; bookmarked: boolean }
-  | { kind: 'gap'; start: number; end: number };
+  | {
+      kind: 'line';
+      line: number;
+      text: string;
+      level: number;
+      bookmarked: boolean;
+      /**
+       * Set on the first line of a run the user revealed from a gap: the
+       * lines that run covers, so it can be hidden again.
+       */
+      revealed?: { start: number; end: number; count: number };
+      /** Shown only because the user revealed it from a gap. */
+      extra?: boolean;
+    }
+  | {
+      kind: 'gap';
+      start: number;
+      end: number;
+      /** The line just above the gap was revealed by the user (so "show more" continues down from it). */
+      afterRevealed?: boolean;
+      /** The line just below the gap was revealed by the user (so "show more" continues up from it). */
+      beforeRevealed?: boolean;
+    };
 
 export type Response =
   | { type: 'progress'; lines: number; bytes: number; totalBytes: number }
   | { type: 'loaded'; lines: number; counts: number[]; ms: number }
   | { type: 'view'; id: number; rowCount: number; matches: number; bookmarks: number; error: string | null }
   | { type: 'rows'; id: number; start: number; rows: Row[] }
-  | { type: 'found'; id: number; row: number | null };
+  | { type: 'found'; id: number; row: number | null }
+  /** Every line the view shows (no gap rows), joined with newlines. */
+  | { type: 'export'; id: number; blob: Blob; lines: number };

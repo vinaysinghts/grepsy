@@ -98,7 +98,7 @@ button { font: inherit; color: inherit; }
 .brand-btn { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px; background: none; border: 0; border-radius: 6px; font-weight: 600; font-size: 13px; color: var(--text-strong); cursor: pointer; }
 .brand-btn:hover { background: var(--raised); }
 .file-name { font-family: var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
-.search { flex: 1 1 320px; max-width: 640px; display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.search { flex: 1 1 240px; max-width: 640px; display: flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
 .search:focus-within { border-color: var(--accent); }
 .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text-strong); font: 12px var(--mono); }
 .search.invalid { border-color: var(--error); }
@@ -165,12 +165,17 @@ mark[class^='hl'] { color: inherit; border-radius: 2px; }
 
 .body { flex: 1; min-height: 0; display: flex; }
 .body .log { flex: 1; min-width: 0; }
-.rules { width: 230px; flex: none; border-left: 1px solid var(--border); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+/* Highlights drop down over the log, so the log keeps the full width. */
+.rules { position: absolute; right: 0; top: 34px; z-index: 5; width: 300px; max-height: min(420px, 70vh); padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; background: var(--popover); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 8px 24px var(--shadow); }
+.rules[hidden] { display: none; }
 .rules ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
 .rules li:hover { background: var(--raised); }
-.swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.rule-term { flex: 1; min-width: 0; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swatch { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; }
+.swatch:hover { outline: 2px solid var(--border-strong); outline-offset: 1px; }
+.rule-term { flex: 1; min-width: 0; padding: 0; background: none; border: 0; color: inherit; text-align: left; font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; cursor: text; }
+.rule-term:hover { text-decoration: underline dotted var(--muted); }
+.rule-edit { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
 .rule-remove { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
 .rule-remove:hover { color: var(--text-strong); background: var(--border); }
 .rule-form input { width: 100%; height: 26px; padding: 0 6px; background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
@@ -192,6 +197,11 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 
 .json-btn { flex: none; align-self: center; height: 16px; margin-left: 8px; padding: 0 5px; background: var(--raised); color: var(--link); border: 1px solid var(--border); border-radius: 4px; font: 500 10px/14px Inter, sans-serif; cursor: pointer; }
 .json-btn:hover { border-color: var(--accent); }
+.row.revealed .gutter { border-right-style: dashed; }
+/* Fold arrows at the gutter's left edge: › on a hidden run, ⌄ on one the user opened. */
+.row, .gap { position: relative; }
+.fold { position: absolute; left: 4px; top: 0; width: 18px; height: var(--row-h); padding: 0; background: none; border: 0; border-radius: 4px; color: var(--muted); font: 600 13px/var(--row-h) Inter, sans-serif; text-align: center; cursor: pointer; }
+.fold:hover, .gap:hover .fold { color: var(--accent); background: var(--raised); }
 .json-dialog { width: min(720px, 90vw); }
 .json-dialog pre { max-height: 60vh; overflow: auto; margin: 0 0 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); color: var(--text-strong); }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
@@ -207,3 +217,31 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .auto-open-step p { flex: 1 1 260px; }
 .start-head { display: flex; align-items: center; justify-content: space-between; }
 .tool-btn.icon svg { display: block; margin: auto; }
+/* Status bar actions: bookmark stepping, copy and save. */
+.link-btn { padding: 0 4px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
+.link-btn:hover { color: var(--text-strong); background: var(--raised); }
+.link-btn:disabled { opacity: 0.5; cursor: default; }
+.bm-nav { display: inline-flex; align-items: center; gap: 2px; }
+.bm-nav[hidden] { display: none; }
+.bm-nav .link-btn { font-size: 14px; line-height: 1; }
+/* Big gaps: show a few lines from either end, or all. */
+.gap.big { cursor: pointer; }
+.gap.big .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
+.gap.big .gap-act:hover { color: var(--accent); background: var(--raised); }
+.rule-filter { padding: 0 6px; height: 20px; background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }
+.rule-filter:hover { color: var(--text-strong); border-color: var(--accent); }
+.rule-re { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+/* Loading: the Grepsy mark, its lens sweeping the lines. */
+.loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--bg); }
+.loading[hidden] { display: none; }
+.loading-mark .ln { stroke: var(--accent); stroke-width: 11; opacity: 0.35; animation: grepsy-line 1.2s ease-in-out infinite; }
+.loading-mark .ln2 { animation-delay: 0.2s; }
+.loading-mark .ln3 { animation-delay: 0.4s; }
+.loading-mark .lens { stroke: var(--accent); animation: grepsy-lens 1.2s ease-in-out infinite alternate; }
+@keyframes grepsy-line { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes grepsy-lens { from { transform: translate(-48px, -50px); } to { transform: translate(0, 0); } }
+@media (prefers-reduced-motion: reduce) { .loading-mark .ln, .loading-mark .lens { animation: none; opacity: 1; } }
+.loading-title { margin: 6px 0 0; font-family: var(--mono); font-size: 13px; color: var(--text-strong); max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loading-bar { width: 220px; height: 3px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+.loading-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+.loading-detail { margin: 0; font-size: 11px; min-height: 1em; }

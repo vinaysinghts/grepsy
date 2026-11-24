@@ -1,4 +1,4 @@
-import { autoOpenView, fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
+import { WEB_ORIGINS, autoOpenView, autoOpenWanted, fileNameFromUrl, isLoadableSource } from '../core/autoOpen';
 import { HTML_PAGE_MESSAGE, httpFailureMessage, isHtmlResponse, networkFailureMessage } from '../core/download';
 
 /**
@@ -35,7 +35,11 @@ export async function fetchAsFile(url: string, askForAccess: boolean): Promise<F
   return new File([await res.blob()], fileNameFromUrl(url));
 }
 
-/** The "Open .log files automatically" card on the start screen. */
+/**
+ * The auto-open switch, on the start screen and in the toolbar popup. Auto-open
+ * is on by default; the file:///* permission is granted at install, so the only
+ * step left is Chrome's "Allow access to file URLs", which only the user can flip.
+ */
 export async function setupAutoOpen(): Promise<void> {
   const btn = document.getElementById('auto-open-btn') as HTMLButtonElement;
   const status = document.getElementById('auto-open-status')!;
@@ -43,14 +47,12 @@ export async function setupAutoOpen(): Promise<void> {
   const fileAccessBtn = document.getElementById('file-access-btn')!;
   if (!chrome.permissions || !chrome.storage) return;
 
-  let needsFileAccess = false;
   const refresh = async () => {
     const { autoOpen } = await chrome.storage.local.get('autoOpen');
     const view = autoOpenView({
-      wanted: autoOpen === true,
+      wanted: autoOpenWanted(autoOpen),
       hasPermission: await chrome.permissions.contains({ origins: ['file:///*'] }),
       fileAccess: await chrome.extension.isAllowedFileSchemeAccess(),
-      needsFileAccess,
     });
     btn.textContent = view.button;
     btn.setAttribute('aria-pressed', String(view.on));
@@ -59,27 +61,17 @@ export async function setupAutoOpen(): Promise<void> {
   };
 
   btn.addEventListener('click', async () => {
-    if (btn.getAttribute('aria-pressed') === 'true') {
-      needsFileAccess = false;
+    const action = btn.textContent;
+    if (action === 'Turn off') {
       await chrome.storage.local.set({ autoOpen: false });
-      await chrome.permissions.remove({ origins: ['file:///*'] });
-    } else if (!(await chrome.extension.isAllowedFileSchemeAccess())) {
-      // Chrome throws "Extension must have file access enabled to request
-      // 'file:///*'" if we ask now, so guide the user to the toggle first.
-      needsFileAccess = true;
+    } else if (action === 'Turn on') {
+      await chrome.storage.local.set({ autoOpen: true });
     } else {
-      needsFileAccess = false;
       try {
-        // Must follow the click closely so Chrome shows its prompt. Chrome may
-        // close the toolbar popup while the prompt is up, so leave a note the
-        // background script uses to finish turning this on.
-        await chrome.storage.session.set({ pendingAutoOpen: Date.now() });
-        const granted = await chrome.permissions.request({ origins: ['file:///*'] });
-        await chrome.storage.session.remove('pendingAutoOpen');
-        if (granted) await chrome.storage.local.set({ autoOpen: true });
+        // Must follow the click closely so Chrome shows its prompt.
+        await chrome.permissions.request({ origins: ['file:///*'] });
       } catch (err) {
-        await chrome.storage.session.remove('pendingAutoOpen');
-        status.textContent = `Could not turn this on: ${err instanceof Error ? err.message : String(err)}`;
+        status.textContent = `Could not ask for access: ${err instanceof Error ? err.message : String(err)}`;
         return;
       }
     }
@@ -89,6 +81,34 @@ export async function setupAutoOpen(): Promise<void> {
     void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
   });
   window.addEventListener('focus', () => void refresh());
+  await refresh();
+}
+
+/**
+ * The websites half of auto-open. It shares the one auto-open setting, but
+ * seeing web tab URLs needs access to every site, which Chrome shows as a
+ * strong warning; so it is asked for with one click here, not at install.
+ */
+export async function setupAutoOpenWeb(): Promise<void> {
+  const row = document.getElementById('auto-open-web');
+  const btn = document.getElementById('auto-open-web-btn');
+  if (!row || !btn || !chrome.permissions || !chrome.storage) return;
+  const refresh = async () => {
+    const { autoOpen } = await chrome.storage.local.get('autoOpen');
+    const granted = await chrome.permissions.contains({ origins: WEB_ORIGINS });
+    row.hidden = !autoOpenWanted(autoOpen) || granted;
+  };
+  btn.addEventListener('click', async () => {
+    try {
+      await chrome.permissions.request({ origins: WEB_ORIGINS });
+    } catch {
+      // Refused or unavailable: the row stays, so the user can try again.
+    }
+    await refresh();
+  });
+  chrome.storage.onChanged.addListener((changes) => {
+    if ('autoOpen' in changes) void refresh();
+  });
   await refresh();
 }
 

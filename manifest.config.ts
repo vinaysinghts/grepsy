@@ -43,9 +43,12 @@ export function buildManifest(): chrome.runtime.ManifestV3 {
     // Grepsy". Neither shows an install warning, and access ends when the tab
     // navigates.
     permissions: ['storage', 'activeTab', 'scripting'],
-    // Asked for only when the user turns a feature on: file:// for opening
-    // local logs automatically, and a site's origin when opening a log by URL.
-    optional_host_permissions: ['file:///*', 'https://*/*', 'http://*/*'],
+    // file:// so local .log files open in Grepsy automatically (Chrome also
+    // needs the user's "Allow access to file URLs"; file access shows no
+    // install warning). A site's origin is asked for only when the user opens
+    // a log from it.
+    host_permissions: ['file:///*'],
+    optional_host_permissions: ['https://*/*', 'http://*/*'],
     background: { service_worker: 'background.js', type: 'module' },
     commands: {
       _execute_action: {
