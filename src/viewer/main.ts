@@ -326,14 +326,14 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   div.append(gutter, text);
   if (row.revealed) {
     const { start, end, count } = row.revealed;
-    // ⌄ hide after the first line of an opened run folds it back. It sits
-    // after the text, not in the gutter, so it never covers the line number,
-    // and sticks to the right edge when the line runs off screen.
+    // A faint "hide N lines" after the first line of an opened run folds it
+    // back. It sits after the text, styled like the gap bars, so it never
+    // covers the line number and the log still reads like a plain file.
     const fold = document.createElement('button');
     fold.type = 'button';
     fold.className = 'fold';
-    fold.textContent = '⌄ hide';
     const label = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'} again`;
+    fold.textContent = `hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'}`;
     fold.title = label;
     fold.setAttribute('aria-label', label);
     fold.addEventListener('click', () => {
