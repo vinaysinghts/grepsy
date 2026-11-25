@@ -1,6 +1,6 @@
 import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
-import { findStructures, mayContainStructure, type Structure } from '../core/pretty';
+import { visibleStructures, type Structure } from '../core/pretty';
 import { LEVEL_COUNT } from '../core/lineStore';
 import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
@@ -395,7 +395,7 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   text.className = 'text';
   const shown = row.text.length > MAX_RENDERED_CHARS ? row.text.slice(0, MAX_RENDERED_CHARS) + ' …' : row.text;
   // JSON and XML values get a dotted underline; clicking one pretty-prints it.
-  const values = mayContainStructure(shown) ? findStructures(shown) : [];
+  const values = visibleStructures(row.text, MAX_RENDERED_CHARS);
   const holders = values.map((v) => valueEl(row.line + 1, v));
   // Log text is untrusted: it only ever goes in as text nodes, never as HTML.
   let at = 0;

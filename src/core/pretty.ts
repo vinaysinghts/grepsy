@@ -20,7 +20,24 @@ export interface Structure {
 
 /** Cheap pre-check used while rendering, before a full scan. */
 export function mayContainStructure(line: string): boolean {
-  return line.includes('{"') || line.includes('[{') || line.includes('["') || /<[A-Za-z_][^>]*>/.test(line);
+  // Whitespace may sit after the bracket: `{ "a": 1 }` and `[ {...} ]` are as common as `{"a":1}`.
+  return /[{[]\s*["{]/.test(line) || /<[A-Za-z_][^>]*>/.test(line);
+}
+
+/** How far into a line to look for values; past it, scanning costs too much per row. */
+export const MAX_SCANNED_CHARS = 200_000;
+
+/**
+ * The values to underline when only the first `drawn` characters of a line
+ * are shown. They are found in the whole line, so a long JSON value that runs
+ * past the cut still opens in full; its underline stops at the cut.
+ */
+export function visibleStructures(line: string, drawn: number): Structure[] {
+  const scanned = line.length > MAX_SCANNED_CHARS ? line.slice(0, MAX_SCANNED_CHARS) : line;
+  if (!mayContainStructure(scanned)) return [];
+  return findStructures(scanned)
+    .filter((v) => v.start < drawn)
+    .map((v) => (v.end > drawn ? { ...v, end: drawn } : v));
 }
 
 /** Every JSON or XML value in the line, outermost only, left to right. */
