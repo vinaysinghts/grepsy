@@ -67,6 +67,33 @@ describe('mayContainStructure', () => {
   });
 });
 
+describe('findStructures: Python', () => {
+  it('reads a dict printed by Python, even inside a URL', () => {
+    const line = "2026-11-26T16:20:50.261Z [INFO utils.py::apply::1136::MainThread] POST https://somesite.com/software?task={'hosts': None, 'accept_eula': True}";
+    const [s, ...rest] = findStructures(line);
+    expect(rest).toEqual([]);
+    expect(s?.kind).toBe('python');
+    expect(s?.name).toBe('task');
+    expect(s?.raw).toBe("{'hosts': None, 'accept_eula': True}");
+    expect(s?.pretty).toBe("{\n  'hosts': None,\n  'accept_eula': True\n}");
+    expect(mayContainStructure(line)).toBe(true);
+  });
+
+  it('handles nesting, both quotes, escapes, numbers and a trailing comma', () => {
+    const [s] = findStructures(`x {'a': [1, 2.5, 1e3], "b": 'it\\'s', 'c': {'d': False,},}`);
+    expect(s?.kind).toBe('python');
+    expect(s?.pretty).toBe(`{\n  'a': [\n    1,\n    2.5,\n    1000\n  ],\n  'b': "it's",\n  'c': {\n    'd': False\n  }\n}`);
+  });
+
+  it('skips calls, sets and names that are not literals', () => {
+    expect(findStructures("x {'a': datetime(2026, 1, 1)} {'a', 'b'} {'k': value}")).toEqual([]);
+  });
+
+  it('still prefers strict JSON', () => {
+    expect(findStructures('x {"a": null}')[0]?.kind).toBe('json');
+  });
+});
+
 describe('visibleStructures', () => {
   it('finds spaced JSON in a line', () => {
     const [s] = visibleStructures('09:14 INFO sent { "order": "A-1", "items": [ 1, 2 ] }', 5000);

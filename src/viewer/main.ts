@@ -339,13 +339,15 @@ function draw(): void {
   }
 }
 
+const KIND_LABEL: Record<Structure['kind'], string> = { json: 'JSON', python: 'Python value', xml: 'XML' };
+
 /** A JSON or XML value inside a line: underlined, and opens pretty-printed on click. */
 function valueEl(lineNumber: number, v: Structure): HTMLElement {
   const el = document.createElement('span');
   el.className = 'pv';
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
-  const what = v.kind === 'xml' ? 'XML' : 'JSON';
+  const what = KIND_LABEL[v.kind];
   el.title = `Pretty print this ${what}`;
   const open = () => showStructures(lineNumber, [v]);
   el.addEventListener('click', () => {
@@ -912,7 +914,7 @@ function showStructures(lineNumber: number, found: Structure[]): void {
     if (found.length > 1 || f.name) {
       const h = document.createElement('div');
       h.className = 'json-name';
-      const what = f.name || (f.kind === 'xml' ? 'XML' : 'JSON');
+      const what = f.name || KIND_LABEL[f.kind];
       h.textContent = found.length > 1 ? `${i + 1} of ${found.length} · ${what}` : what;
       jsonBody.append(h);
     }

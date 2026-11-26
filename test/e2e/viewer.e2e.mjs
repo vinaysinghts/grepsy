@@ -173,12 +173,12 @@ try {
 
   // A gzipped log with JSON in a line: decompressed on open, JSON shown pretty-printed.
   await page.reload();
-  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO saved body=<order id="A-1"><item>pen</item></order> req={"a":1}', '09:03 INFO sent { "id": 7, "tags": [ "x" ] }'];
+  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO saved body=<order id="A-1"><item>pen</item></order> req={"a":1}', '09:03 INFO sent { "id": 7, "tags": [ "x" ] }', "09:04 INFO POST https://example.com/x?task={'hosts': None, 'ok': True}"];
   await page.setInputFiles('#file', { name: 'app.log.gz', mimeType: 'application/gzip', buffer: gzipSync(gzLines.join('\n')) });
-  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('4 rows'));
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('5 rows'));
   // Each JSON or XML value is underlined in place; clicking it opens just that value.
   await page.waitForSelector('.pv');
-  assert.equal(await page.locator('.pv').count(), 4);
+  assert.equal(await page.locator('.pv').count(), 5);
   assert.equal(await page.locator('.pv').first().textContent(), '{"order":"A-1182","code":504}');
   await page.locator('.pv').first().click();
   await page.waitForSelector('#json-dialog[open]');
@@ -194,6 +194,11 @@ try {
   await page.locator('.pv').nth(3).click();
   await page.waitForSelector('#json-dialog[open]');
   assert.equal(await page.textContent('#json-body pre'), JSON.stringify({ id: 7, tags: ['x'] }, null, 2));
+  await page.keyboard.press('Escape');
+  // A Python dict, as Python services log them, opens in Python style.
+  await page.locator('.pv').nth(4).click();
+  await page.waitForSelector('#json-dialog[open]');
+  assert.equal(await page.textContent('#json-body pre'), "{\n  'hosts': None,\n  'ok': True\n}");
   await page.keyboard.press('Escape');
 
   // Pasted text opens like a file.
