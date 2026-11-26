@@ -1,11 +1,12 @@
 import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
-import { extractJson, mayContainJson } from '../core/json';
+import { visibleStructures, type Structure } from '../core/pretty';
 import { LEVEL_COUNT } from '../core/lineStore';
 import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
 import { computeWindow, scrollTopForRow } from '../core/virtual';
-import { GAP_SMALL, GAP_STEP, gapStep } from '../core/view';
+import { GAP_SMALL, GAP_STEP } from '../core/view';
+import { rowAtUnit, wrapColumns } from '../core/wrap';
 import type { Request, Response, Row, ViewQuery } from '../worker/protocol';
 import { openShortcuts, setupHelpMenu } from './help';
 import { RuleStore } from './rules';
@@ -55,6 +56,14 @@ const state = {
   cache: new Map<number, Row>(),
   requested: '',
   current: -1,
+  /** When the last jump landed, so the landing line can flash. */
+  flashAt: 0,
+  /** Word wrap on, and the screen-line layout for the current view once the worker sends it. */
+  wrap: false,
+  wrapCols: 0,
+  starts: null as Uint32Array | null,
+  /** Row to bring back to the top once a new wrap layout arrives (keeps your place on toggle). */
+  anchorRow: -1,
   highlight: null as RegExp | null,
   query: { text: '', caseSensitive: false, regex: false, filter: true, context: 0, levels: [] } as ViewQuery,
 };
@@ -225,6 +234,17 @@ worker.onmessage = (e: MessageEvent<Response>) => {
       $('bookmark-nav').hidden = m.bookmarks === 0;
       status.textContent =
         `${m.rowCount.toLocaleString()} rows · ${state.lines.toLocaleString()} lines · read in ${state.loadMs.toLocaleString()} ms`;
+      if (state.wrap) requestWrap(true);
+      render();
+      break;
+    case 'wrap':
+      if (m.id !== state.viewId || m.cols !== state.wrapCols || !state.wrap) return;
+      state.starts = m.starts;
+      if (state.anchorRow >= 0) {
+        const row = Math.min(state.anchorRow, state.rowCount - 1);
+        state.anchorRow = -1;
+        log.scrollTop = scrollTopForRow(m.starts[row]!, log.clientHeight, m.starts[state.rowCount]!, ROW_HEIGHT);
+      }
       render();
       break;
     case 'rows':
@@ -238,6 +258,7 @@ worker.onmessage = (e: MessageEvent<Response>) => {
     case 'found':
       if (m.id !== state.viewId || m.row === null) return;
       state.current = m.row;
+      state.flashAt = performance.now();
       scrollToRow(m.row);
       break;
   }
@@ -261,8 +282,32 @@ function render(): void {
   });
 }
 
+/** The wrap layout, if it matches the rows on show. */
+function layout(): Uint32Array | null {
+  const st = state.starts;
+  return state.wrap && st && st.length === state.rowCount + 1 ? st : null;
+}
+
+/** Which rows to draw, and where, in rows (no wrap) or wrapped screen lines. */
+function visibleRows(): { first: number; count: number; offset: number; totalHeight: number } {
+  const st = layout();
+  if (!st) return computeWindow(log.scrollTop, log.clientHeight, state.rowCount, ROW_HEIGHT);
+  // Work in screen lines, then map back to whole rows.
+  const w = computeWindow(log.scrollTop, log.clientHeight, st[state.rowCount]!, ROW_HEIGHT);
+  const first = rowAtUnit(st, w.first);
+  const offset = w.offset - (w.first - st[first]!) * ROW_HEIGHT;
+  let last = first;
+  while (last < state.rowCount && st[last]! < w.first + w.count) last++;
+  return { first, count: last - first, offset, totalHeight: w.totalHeight };
+}
+
 function draw(): void {
-  const w = computeWindow(log.scrollTop, log.clientHeight, state.rowCount, ROW_HEIGHT);
+  const st = layout();
+  // Wrap is on but the layout for these rows is still on its way: keep the
+  // old screen for that moment rather than flash an unwrapped one.
+  if (state.wrap && !st && state.rowCount > 0) return;
+  const w = visibleRows();
+  rowsEl.classList.toggle('wrap', st !== null);
   spacer.style.height = `${w.totalHeight}px`;
   rowsEl.style.transform = `translateY(${w.offset}px)`;
 
@@ -277,7 +322,9 @@ function draw(): void {
       out.push(blank);
       continue;
     }
-    out.push(row.kind === 'gap' ? gapEl(row) : lineEl(row, r));
+    const el = row.kind === 'gap' ? gapEl(row) : lineEl(row, r);
+    if (st && row.kind === 'line') el.style.height = `${(st[r + 1]! - st[r]!) * ROW_HEIGHT}px`;
+    out.push(el);
   }
   rowsEl.replaceChildren(...out);
 
@@ -292,6 +339,34 @@ function draw(): void {
   }
 }
 
+const KIND_LABEL: Record<Structure['kind'], string> = { json: 'JSON', python: 'Python value', xml: 'XML' };
+
+/** A JSON or XML value inside a line: underlined, and opens pretty-printed on click. */
+function valueEl(lineNumber: number, v: Structure): HTMLElement {
+  const el = document.createElement('span');
+  el.className = 'pv';
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  const what = KIND_LABEL[v.kind];
+  el.title = `Pretty print this ${what}`;
+  const open = () => showStructures(lineNumber, [v]);
+  el.addEventListener('click', () => {
+    // Selecting text to copy it shouldn't open the dialog.
+    if (window.getSelection()?.toString()) return;
+    open();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+    }
+  });
+  return el;
+}
+
+/** Matches the .flash animation in styles.css. */
+const FLASH_MS = 900;
+
 function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement {
   const div = document.createElement('div');
   div.className =
@@ -299,6 +374,15 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
     (row.bookmarked ? ' bookmarked' : '') +
     (row.extra ? ' revealed' : '') +
     (index === state.current ? ' current' : '');
+  // A jump makes the landing line flash once, so the eye finds it. Rows are
+  // rebuilt while scrolling, so the animation resumes where it was.
+  if (index === state.current) {
+    const age = performance.now() - state.flashAt;
+    if (age < FLASH_MS) {
+      div.classList.add('flash');
+      div.style.animationDelay = `${-age}ms`;
+    }
+  }
   const gutter = document.createElement('button');
   gutter.type = 'button';
   gutter.className = 'gutter';
@@ -312,46 +396,50 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   const text = document.createElement('span');
   text.className = 'text';
   const shown = row.text.length > MAX_RENDERED_CHARS ? row.text.slice(0, MAX_RENDERED_CHARS) + ' …' : row.text;
+  // JSON and XML values get a dotted underline; clicking one pretty-prints it.
+  const values = visibleStructures(row.text, MAX_RENDERED_CHARS);
+  const holders = values.map((v) => valueEl(row.line + 1, v));
   // Log text is untrusted: it only ever goes in as text nodes, never as HTML.
+  let at = 0;
   for (const span of splitTagged(shown, patterns())) {
-    if (span.tag === null) {
-      text.append(span.text);
-    } else {
-      const mark = document.createElement('mark');
-      if (span.tag >= 0) mark.className = `hl${span.tag}`;
-      mark.textContent = span.text;
-      text.append(mark);
+    // Cut the span where a value starts or ends, so each piece lands in one place.
+    let rest = span.text;
+    while (rest) {
+      const v = values.findIndex((x) => at >= x.start && at < x.end);
+      const next = v >= 0 ? values[v]!.end : Math.min(...values.filter((x) => x.start > at).map((x) => x.start), Infinity);
+      const piece = rest.slice(0, Math.max(1, next - at));
+      rest = rest.slice(piece.length);
+      at += piece.length;
+      let node: Node | string = piece;
+      if (span.tag !== null) {
+        const mark = document.createElement('mark');
+        if (span.tag >= 0) mark.className = `hl${span.tag}`;
+        mark.textContent = piece;
+        node = mark;
+      }
+      const holder = v >= 0 ? holders[v]! : text;
+      if (v >= 0 && holder.parentNode !== text) text.append(holder);
+      holder.append(node);
     }
   }
   div.append(gutter, text);
   if (row.revealed) {
     const { start, end, count } = row.revealed;
-    // A fold arrow, like a code editor's: ⌄ on an opened run folds it back.
+    // A faint "hide N lines" after the first line of an opened run folds it
+    // back. It sits after the text, styled like the gap bars, so it never
+    // covers the line number and the log still reads like a plain file.
     const fold = document.createElement('button');
     fold.type = 'button';
     fold.className = 'fold';
-    fold.textContent = '⌄';
     const label = `Hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'} again`;
+    fold.textContent = `hide ${count.toLocaleString()} ${count === 1 ? 'line' : 'lines'}`;
     fold.title = label;
     fold.setAttribute('aria-label', label);
     fold.addEventListener('click', () => {
       state.viewId++;
       send({ type: 'collapse', id: state.viewId, start, end });
     });
-    div.prepend(fold);
-  }
-  if (mayContainJson(row.text)) {
-    const found = extractJson(row.text);
-    if (found) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'json-btn';
-      btn.textContent = '{ }';
-      btn.title = 'View JSON';
-      btn.setAttribute('aria-label', `View JSON on line ${row.line + 1}`);
-      btn.addEventListener('click', () => showJson(row.line + 1, found.value));
-      div.append(btn);
-    }
+    div.append(fold);
   }
   return div;
 }
@@ -367,10 +455,6 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     state.viewId++;
     send({ type: 'expand', id: state.viewId, start, end });
   };
-  const fold = document.createElement('span');
-  fold.className = 'fold';
-  fold.setAttribute('aria-hidden', 'true');
-  fold.textContent = '›';
   const g = document.createElement('span');
   g.className = 'gutter';
   g.textContent = '⋯';
@@ -379,19 +463,9 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
   line.className = 'line';
   const hidden = `${n.toLocaleString()} ${n === 1 ? 'line' : 'lines'} hidden`;
 
-  if (n <= GAP_SMALL) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'gap';
-    label.textContent = `${hidden}, click to show`;
-    btn.append(fold, g, label, line);
-    btn.addEventListener('click', () => expand([row.start, row.end]));
-    return btn;
-  }
-  // A big gap stays one bar: it shrinks from either edge as lines are
-  // revealed, and goes away once it is empty, so revealed blocks join up.
+  // Only the buttons act; the "N lines hidden" text is just a label.
   const div = document.createElement('div');
-  div.className = 'gap big';
+  div.className = n > GAP_SMALL ? 'gap big' : 'gap';
   label.textContent = `${hidden}:`;
   const act = (text: string, title: string, range: [number, number]) => {
     const b = document.createElement('button');
@@ -399,39 +473,116 @@ function gapEl(row: Extract<Row, { kind: 'gap' }>): HTMLElement {
     b.className = 'gap-act';
     b.textContent = text;
     b.title = title;
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      expand(range);
-    });
+    b.addEventListener('click', () => expand(range));
     return b;
   };
   const acts: HTMLElement[] = [];
-  // ↑ grows the lines below the gap upwards; ↓ grows the lines above downwards.
+  // Small gaps open whole: a "show more" step would only cost clicks. A big
+  // gap stays one bar that shrinks from either edge as lines are revealed,
+  // and goes away once it is empty, so revealed blocks join up.
+  // ↓ grows the lines above the gap downwards; ↑ grows the lines below upwards.
   // Neither is offered at the edge of the file, where there is nothing to grow.
-  if (row.end < state.lines) {
-    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
-  }
-  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
-  if (row.start > 0) {
+  if (n > GAP_SMALL && row.start > 0) {
     acts.push(act(`↓ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines below the line above`, [row.start, row.start + GAP_STEP]));
   }
-  // Anywhere else on the row (the › arrow, the text) shows more next to
-  // the block you are already opening.
-  const step = gapStep(row);
-  div.title = `Show ${GAP_STEP} more lines`;
-  div.addEventListener('click', () => expand(step));
-  div.append(fold, g, label, ...acts, line);
+  acts.push(act('show all', `Show all ${n.toLocaleString()} lines`, [row.start, row.end]));
+  if (n > GAP_SMALL && row.end < state.lines) {
+    acts.push(act(`↑ ${GAP_STEP} more`, `Show ${GAP_STEP} more lines above the line below`, [row.end - GAP_STEP, row.end]));
+  }
+  div.append(g, label, ...acts, line);
   return div;
 }
 
 function scrollToRow(row: number): void {
-  const top = scrollTopForRow(row, log.clientHeight, state.rowCount, ROW_HEIGHT);
+  const st = layout();
+  const top = st
+    ? scrollTopForRow(st[row]!, log.clientHeight, st[state.rowCount]!, ROW_HEIGHT)
+    : scrollTopForRow(row, log.clientHeight, state.rowCount, ROW_HEIGHT);
   log.scrollTop = Math.max(0, top - log.clientHeight / 3);
   render();
 }
 
 log.addEventListener('scroll', render);
-window.addEventListener('resize', render);
+window.addEventListener('resize', () => {
+  if (state.wrap) requestWrap(false);
+  render();
+});
+
+// ---- Word wrap -------------------------------------------------------------
+
+const wrapBtn = $<HTMLButtonElement>('wrap-toggle');
+
+/** Characters that fit beside the gutter, leaving room for the { } and hide buttons. */
+function measureColumns(): number {
+  const probe = document.createElement('div');
+  probe.className = 'row';
+  probe.style.visibility = 'hidden';
+  const g = document.createElement('span');
+  g.className = 'gutter';
+  const t = document.createElement('span');
+  t.className = 'text';
+  t.style.padding = '0';
+  t.textContent = 'x'.repeat(100);
+  probe.append(g, t);
+  rowsEl.append(probe);
+  const box = t.getBoundingClientRect();
+  const textLeft = box.left - probe.getBoundingClientRect().left;
+  probe.remove();
+  return wrapColumns(log.clientWidth - textLeft - WRAP_RESERVE, box.width / 100);
+}
+/** Room kept right of wrapped text for the buttons that follow it. */
+const WRAP_RESERVE = 150;
+
+/** Asks the worker for a wrap layout if the width changed or the rows did (`fresh`). */
+function requestWrap(fresh: boolean): void {
+  const cols = measureColumns();
+  if (!fresh && cols === state.wrapCols && layout()) return;
+  // A new width moves every row: keep the one at the top in place.
+  if (!fresh && state.anchorRow < 0 && layout()) state.anchorRow = topRow();
+  state.wrapCols = cols;
+  rowsEl.style.setProperty('--wrap-cols', String(cols));
+  send({ type: 'wrap', id: state.viewId, cols });
+}
+
+/** The row at the top of the screen. */
+function topRow(): number {
+  const st = layout();
+  const w = st
+    ? computeWindow(log.scrollTop, log.clientHeight, st[state.rowCount]!, ROW_HEIGHT, 0)
+    : computeWindow(log.scrollTop, log.clientHeight, state.rowCount, ROW_HEIGHT, 0);
+  return st ? rowAtUnit(st, w.first) : w.first;
+}
+
+function setWrap(on: boolean): void {
+  if (on === state.wrap) return;
+  state.anchorRow = topRow();
+  state.wrap = on;
+  wrapBtn.setAttribute('aria-pressed', String(on));
+  try {
+    localStorage.setItem('wrap', on ? '1' : '0');
+  } catch {
+    // Storage blocked: the choice lasts for this page only.
+  }
+  if (on) {
+    state.wrapCols = 0;
+    requestWrap(true);
+  } else {
+    state.starts = null;
+    const row = state.anchorRow;
+    state.anchorRow = -1;
+    log.scrollTop = scrollTopForRow(row, log.clientHeight, state.rowCount, ROW_HEIGHT);
+  }
+  render();
+}
+wrapBtn.addEventListener('click', () => setWrap(!state.wrap));
+try {
+  if (localStorage.getItem('wrap') === '1') {
+    state.wrap = true;
+    wrapBtn.setAttribute('aria-pressed', 'true');
+  }
+} catch {
+  // See setWrap.
+}
 
 // ---- Toolbar --------------------------------------------------------------
 
@@ -532,6 +683,12 @@ document.addEventListener('keydown', (e) => {
     findNext('bookmark', e.shiftKey ? -1 : 1);
     return;
   }
+  // Alt+Z, as in VS Code. e.code, because Alt changes e.key on a Mac (Ω).
+  if (e.altKey && !e.ctrlKey && !e.metaKey && e.code === 'KeyZ') {
+    e.preventDefault();
+    setWrap(!state.wrap);
+    return;
+  }
   if (e.target instanceof HTMLInputElement) return;
   if (e.key === '/') {
     e.preventDefault();
@@ -541,7 +698,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ---- Highlight rules ------------------------------------------------------
+// ---- Quick filters -------------------------------------------------------
 
 const ruleStore = new RuleStore();
 const rulesPanel = $('rules-panel');
@@ -554,46 +711,50 @@ function drawRules(): void {
   rulesList.replaceChildren(
     ...ruleStore.rules.map((r, i) => {
       const li = document.createElement('li');
-      // The color dot cycles colors; the term edits in place on click.
+      // The dot marks the filter as a highlight (colored in every log) or not.
       const sw = document.createElement('button');
       sw.type = 'button';
-      sw.className = `swatch hl${r.color}`;
-      sw.title = 'Change color';
-      sw.setAttribute('aria-label', `Change color of ${r.term}`);
-      sw.addEventListener('click', () => ruleStore.nextColor(i));
+      sw.className = r.highlight ? `swatch hl${r.color}` : 'swatch off';
+      sw.setAttribute('aria-pressed', String(r.highlight));
+      sw.title = r.highlight ? 'Highlighted in every log: click to stop' : 'Click to highlight in every log';
+      sw.setAttribute('aria-label', `Highlight ${r.term}`);
+      sw.addEventListener('click', () => ruleStore.toggleHighlight(i));
+      // The term itself is the filter.
       const term = document.createElement('button');
       term.type = 'button';
       term.className = 'rule-term';
       term.textContent = r.term;
-      term.title = 'Click to edit';
-      term.addEventListener('click', () => editRule(i, term));
-      const rm = document.createElement('button');
-      rm.type = 'button';
-      rm.className = 'rule-remove';
-      rm.textContent = '×';
-      rm.setAttribute('aria-label', `Remove highlight ${r.term}`);
-      rm.addEventListener('click', () => ruleStore.remove(i));
-      const filterBtnEl = document.createElement('button');
-      filterBtnEl.type = 'button';
-      filterBtnEl.className = 'rule-filter';
-      filterBtnEl.textContent = 'Filter';
-      filterBtnEl.title = `Show only lines matching ${r.term}`;
-      filterBtnEl.addEventListener('click', () => {
+      term.title = `Show only lines matching ${r.term}`;
+      term.addEventListener('click', () => {
         setRulesOpen(false);
         applySearch(r.term, r.regex === true);
       });
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'rule-btn rule-edit-btn';
+      edit.textContent = '✎';
+      edit.title = 'Edit';
+      edit.setAttribute('aria-label', `Edit ${r.term}`);
+      edit.addEventListener('click', () => editRule(i, term));
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'rule-btn rule-remove';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', `Remove ${r.term}`);
+      rm.addEventListener('click', () => ruleStore.remove(i));
+      li.append(sw, term);
       if (r.regex) {
         const re = document.createElement('span');
         re.className = 'rule-re';
         re.textContent = '.*';
         re.title = 'Regular expression';
-        term.after(re);
+        li.append(re);
       }
-      li.append(sw, term, filterBtnEl, rm);
+      li.append(edit, rm);
       return li;
     }),
   );
-  rulesToggle.textContent = ruleStore.rules.length ? `Highlights ${ruleStore.rules.length}` : 'Highlights';
+  rulesToggle.textContent = ruleStore.rules.length ? `Quick filters ${ruleStore.rules.length}` : 'Quick filters';
   render();
 }
 
@@ -604,7 +765,7 @@ function editRule(index: number, term: HTMLElement): void {
   const input = document.createElement('input');
   input.className = 'rule-edit';
   input.value = rule.term;
-  input.setAttribute('aria-label', 'Edit highlight');
+  input.setAttribute('aria-label', 'Edit quick filter');
   input.spellcheck = false;
   let done = false;
   const finish = (save: boolean) => {
@@ -612,6 +773,7 @@ function editRule(index: number, term: HTMLElement): void {
     done = true;
     if (save && input.value !== rule.term && ruleStore.edit(index, input.value)) return; // redrawn by onChange
     drawRules();
+    rulesList.querySelectorAll<HTMLElement>('.rule-edit-btn')[index]?.focus();
   };
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') finish(true);
@@ -668,7 +830,7 @@ function applySearch(text: string, regex: boolean): void {
   requestView();
 }
 
-// Save: the current search joins the Highlights list, ready to reuse.
+// Save: the current search joins the Quick filters list, ready to reuse.
 const saveSearchBtn = $<HTMLButtonElement>('save-search');
 saveSearchBtn.addEventListener('click', () => {
   if (ruleStore.add(search.value, state.query.regex)) {
@@ -744,11 +906,25 @@ document.addEventListener('keydown', (e) => {
 
 const jsonDialog = $<HTMLDialogElement>('json-dialog');
 const jsonBody = $('json-body');
-function showJson(lineNumber: number, value: unknown): void {
+let shownPretty = '';
+function showStructures(lineNumber: number, found: Structure[]): void {
   $('json-line').textContent = lineNumber.toLocaleString();
-  jsonBody.textContent = JSON.stringify(value, null, 2);
+  jsonBody.replaceChildren();
+  found.forEach((f, i) => {
+    if (found.length > 1 || f.name) {
+      const h = document.createElement('div');
+      h.className = 'json-name';
+      const what = f.name || KIND_LABEL[f.kind];
+      h.textContent = found.length > 1 ? `${i + 1} of ${found.length} · ${what}` : what;
+      jsonBody.append(h);
+    }
+    const pre = document.createElement('pre');
+    pre.textContent = f.pretty;
+    jsonBody.append(pre);
+  });
+  shownPretty = found.map((f) => f.pretty).join('\n\n');
   jsonDialog.showModal();
 }
 $('json-copy').addEventListener('click', () => {
-  void navigator.clipboard.writeText(jsonBody.textContent ?? '');
+  void navigator.clipboard.writeText(shownPretty);
 });

@@ -16,6 +16,8 @@ export type Request =
   | { type: 'expand'; id: number; start: number; end: number }
   | { type: 'collapse'; id: number; start: number; end: number }
   | { type: 'export'; id: number }
+  /** Screen lines per row when wrapped at `cols` characters, for the view `id`. */
+  | { type: 'wrap'; id: number; cols: number }
   | { type: 'bookmark'; id: number; line: number }
   | { type: 'rows'; id: number; start: number; count: number }
   | { type: 'find'; id: number; fromRow: number; direction: 1 | -1; target: 'match' | 'error' | 'bookmark' };
@@ -52,4 +54,5 @@ export type Response =
   | { type: 'rows'; id: number; start: number; rows: Row[] }
   | { type: 'found'; id: number; row: number | null }
   /** Every line the view shows (no gap rows), joined with newlines. */
-  | { type: 'export'; id: number; blob: Blob; lines: number };
+  | { type: 'export'; id: number; blob: Blob; lines: number }
+  | { type: 'wrap'; id: number; cols: number; starts: Uint32Array };

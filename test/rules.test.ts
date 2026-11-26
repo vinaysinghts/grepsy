@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLOR_COUNT, RuleStore } from '../src/viewer/rules';
+import { RuleStore } from '../src/viewer/rules';
 
 // RuleStore saves to chrome.storage when it exists; in Node it keeps rules in memory.
 function store(...terms: string[]): RuleStore {
@@ -13,7 +13,7 @@ describe('RuleStore editing', () => {
     const s = store('timeout', 'user_id=42');
     const color = s.rules[1]!.color;
     expect(s.edit(1, 'user_id=7')).toBe(true);
-    expect(s.rules[1]).toEqual({ term: 'user_id=7', color });
+    expect(s.rules[1]).toEqual({ term: 'user_id=7', color, highlight: false });
   });
 
   it('keeps spaces as typed', () => {
@@ -35,11 +35,34 @@ describe('RuleStore editing', () => {
     expect(s.edit(0, '(')).toBe(false);
     expect(s.edit(0, 'order_\\d+')).toBe(true);
   });
+});
 
-  it('cycles colors', () => {
-    const s = store('a');
-    const start = s.rules[0]!.color;
-    s.nextColor(0);
-    expect(s.rules[0]!.color).toBe((start + 1) % COLOR_COUNT);
+describe('RuleStore quick filters', () => {
+  it('adds filters without coloring them, unless asked', () => {
+    const s = new RuleStore();
+    s.add('timeout');
+    s.add('retry', false, true);
+    expect(s.rules.map((r) => r.highlight)).toEqual([false, true]);
+    expect(s.patterns()).toHaveLength(1);
+  });
+
+  it('marks a filter as a highlight and back', () => {
+    const s = store('timeout');
+    s.toggleHighlight(0);
+    expect(s.patterns()).toHaveLength(1);
+    s.toggleHighlight(0);
+    expect(s.patterns()).toHaveLength(0);
+  });
+
+  it('keeps terms saved before quick filters highlighted', async () => {
+    const saved = [{ term: 'old', color: 2 }, { term: 'new', color: 1, highlight: false }];
+    (globalThis as { chrome?: unknown }).chrome = { storage: { local: { get: async () => ({ highlightRules: saved }), set: async () => {} } } };
+    try {
+      const s = new RuleStore();
+      await s.load();
+      expect(s.rules.map((r) => [r.term, r.highlight])).toEqual([['old', true], ['new', false]]);
+    } finally {
+      delete (globalThis as { chrome?: unknown }).chrome;
+    }
   });
 });

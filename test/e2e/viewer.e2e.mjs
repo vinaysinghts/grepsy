@@ -44,7 +44,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
 
   await page.waitForSelector('.gap');
-  await page.locator('.gap').last().click();
+  await page.locator('.gap .gap-act:has-text("show all")').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
   // Revealed lines can be hidden again, back to the filtered view.
   await page.waitForSelector('.row.revealed');
@@ -52,7 +52,7 @@ try {
   await page.click('.row .fold');
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('9 rows'));
   assert.equal(await page.locator('.row.revealed').count(), 0);
-  await page.locator('.gap').last().click();
+  await page.locator('.gap .gap-act:has-text("show all")').last().click();
   await page.waitForFunction(() => document.querySelector('#status').textContent.startsWith('12 rows'));
 
   await page.locator('.row .gutter').first().click();
@@ -75,13 +75,13 @@ try {
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#save-shown')]);
   assert.equal(download.suggestedFilename(), 'sample-shown.log');
 
-  // Save the search, then reuse it from the Highlights list in one click.
+  // Save the search, then reuse it from Quick filters in one click.
   await page.click('#save-search');
   await page.click('#rules-toggle');
-  await page.waitForSelector('.rule-filter');
+  await page.waitForSelector('.rule-term');
   await page.fill('#q', '');
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '');
-  await page.click('.rule-filter');
+  await page.click('.rule-term');
   assert.equal(await page.inputValue('#q'), 'timeout');
   await page.waitForFunction(() => document.querySelector('#match-count').textContent === '3 matches');
   assert.equal(await page.isHidden('#rules-panel'), true, 'the dropdown closes to show the results');
@@ -97,6 +97,8 @@ try {
   await page.keyboard.press('n');
   await page.waitForSelector('.row.current');
   assert.match(await page.textContent('.row.current'), /ERROR \[payments\]/);
+  // The landing line flashes once, then settles.
+  await page.waitForSelector('.row.current.flash');
 
   // Hiding warnings collapses them into a gap. (The DEBUG line stays: it is bookmarked.)
   // A plain click shows only that level; a second click shows all again.
@@ -115,26 +117,23 @@ try {
   assert.equal(await page.locator('.row', { hasText: 'WARN' }).count(), 0);
   assert.equal(await page.locator('.row', { hasText: 'DEBUG' }).count(), 1);
 
-  // Highlight rules: add one, see it color the text, and find it again after a reload.
+  // Quick filters: add one, mark it as a highlight, and find it again after a reload.
   await page.click('#rules-toggle');
   await page.fill('#rule-input', 'user_id=42');
   await page.press('#rule-input', 'Enter');
+  assert.equal(await page.textContent('#rules-toggle'), 'Quick filters 1');
+  assert.equal(await page.locator('mark.hl0').count(), 0, 'a new quick filter is not a highlight');
+  await page.click('.rules .swatch.off');
   await page.waitForSelector('mark.hl0', { state: 'attached' });
-  assert.equal(await page.textContent('#rules-toggle'), 'Highlights 1');
-  // Saved terms edit in place, and the color dot cycles colors.
-  await page.click('.rule-term');
+  // Saved terms edit in place with ✎.
+  await page.click('.rule-edit-btn');
   await page.fill('.rule-edit', 'user_id=56');
   await page.press('.rule-edit', 'Enter');
   await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=56');
-  await page.click('.rule-term');
+  await page.click('.rule-edit-btn');
   await page.fill('.rule-edit', 'user_id=42');
   await page.press('.rule-edit', 'Enter');
   await page.waitForFunction(() => document.querySelector('.rule-term')?.textContent === 'user_id=42');
-  await page.click('.rules .swatch');
-  await page.waitForSelector('.rules .swatch.hl1');
-  await page.click('.rules .swatch');
-  for (let i = 0; i < 4; i++) await page.click('.rules .swatch');
-  await page.waitForSelector('.rules .swatch.hl0');
   await page.reload();
   await page.setInputFiles('#file', sample);
   await page.waitForSelector('mark.hl0', { state: 'attached' });
@@ -174,14 +173,32 @@ try {
 
   // A gzipped log with JSON in a line: decompressed on open, JSON shown pretty-printed.
   await page.reload();
-  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO done'];
+  const gzLines = ['09:00 INFO start', '09:01 ERROR failed {"order":"A-1182","code":504}', '09:02 INFO saved body=<order id="A-1"><item>pen</item></order> req={"a":1}', '09:03 INFO sent { "id": 7, "tags": [ "x" ] }', "09:04 INFO POST https://example.com/x?task={'hosts': None, 'ok': True}"];
   await page.setInputFiles('#file', { name: 'app.log.gz', mimeType: 'application/gzip', buffer: gzipSync(gzLines.join('\n')) });
-  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('3 rows'));
-  await page.waitForSelector('.json-btn');
-  assert.equal(await page.locator('.json-btn').count(), 1);
-  await page.click('.json-btn');
+  await page.waitForFunction(() => document.querySelector('#status')?.textContent.startsWith('5 rows'));
+  // Each JSON or XML value is underlined in place; clicking it opens just that value.
+  await page.waitForSelector('.pv');
+  assert.equal(await page.locator('.pv').count(), 5);
+  assert.equal(await page.locator('.pv').first().textContent(), '{"order":"A-1182","code":504}');
+  await page.locator('.pv').first().click();
   await page.waitForSelector('#json-dialog[open]');
-  assert.equal(await page.textContent('#json-body'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
+  assert.equal(await page.textContent('#json-body pre'), JSON.stringify({ order: 'A-1182', code: 504 }, null, 2));
+  await page.keyboard.press('Escape');
+  // XML on a line with JSON too: only the clicked value opens, under its name.
+  await page.locator('.pv').nth(1).click();
+  await page.waitForSelector('#json-dialog[open]');
+  assert.deepEqual(await page.locator('.json-name').allTextContents(), ['body']);
+  assert.equal(await page.locator('#json-body pre').first().textContent(), '<order id="A-1">\n  <item>pen</item>\n</order>');
+  await page.keyboard.press('Escape');
+  // JSON written with spaces after the brackets is found too.
+  await page.locator('.pv').nth(3).click();
+  await page.waitForSelector('#json-dialog[open]');
+  assert.equal(await page.textContent('#json-body pre'), JSON.stringify({ id: 7, tags: ['x'] }, null, 2));
+  await page.keyboard.press('Escape');
+  // A Python dict, as Python services log them, opens in Python style.
+  await page.locator('.pv').nth(4).click();
+  await page.waitForSelector('#json-dialog[open]');
+  assert.equal(await page.textContent('#json-body pre'), "{\n  'hosts': None,\n  'ok': True\n}");
   await page.keyboard.press('Escape');
 
   // Pasted text opens like a file.
@@ -361,8 +378,12 @@ try {
   assert.equal(await page.getAttribute('.row .fold', 'title'), 'Hide 10 lines again');
   await page.click('.row .fold');
   await rowsAre(3);
-  // Clicking the row (the › arrow too) is "show more"; show all opens the rest.
-  await page.click('.gap.big .fold');
+  // The "lines hidden" text is only a label: clicking it does nothing.
+  await page.click('.gap.big .gutter');
+  await page.click('.gap.big span:not(.gutter):not(.line)');
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent('#status'), /^3 rows/);
+  await page.click('.gap-act:has-text("↓ 5 more")');
   await rowsAre(8);
   await page.click('.gap-act:has-text("show all")');
   await rowsAre(200);
@@ -378,6 +399,27 @@ try {
   assert.equal(await page.textContent('.row.revealed .text'), 'filler 193');
   await page.click('.gap-act:has-text("↑ 5 more")');
   await rowsAre(12);
+
+  // Word wrap (Alt+Z): long lines wrap, each row exactly as tall as its text.
+  const wide = ['short one', 'long ' + 'abcdefghij'.repeat(60), 'tab\tseparated\tline ' + 'x'.repeat(300), 'short two'].join('\n');
+  await page.goto(`chrome-extension://${id}/viewer.html`);
+  await page.setInputFiles('#file', { name: 'wide.log', mimeType: 'text/plain', buffer: Buffer.from(wide) });
+  await page.waitForSelector('#viewer:not([hidden]) .row .text');
+  await page.locator('#log').focus();
+  await page.keyboard.press('Alt+KeyZ');
+  await page.waitForSelector('.rows.wrap');
+  assert.equal(await page.getAttribute('#wrap-toggle', 'aria-pressed'), 'true');
+  const fit = await page.$$eval('.rows.wrap .row', (rows) =>
+    rows.map((r) => [Math.round(r.getBoundingClientRect().height), Math.round(r.querySelector('.text').getBoundingClientRect().height)]),
+  );
+  assert.ok(fit[1][0] > 20, 'the long line wraps');
+  for (const [row, text] of fit) assert.equal(text, row, 'each row is as tall as its wrapped text');
+  // The last line is still reachable at the bottom.
+  await page.evaluate(() => { const l = document.querySelector('#log'); l.scrollTop = l.scrollHeight; });
+  await page.waitForSelector('.row:has-text("short two")');
+  await page.click('#wrap-toggle');
+  await page.waitForSelector('.rows:not(.wrap)');
+  assert.equal(await page.getAttribute('#wrap-toggle', 'aria-pressed'), 'false');
 
   // Auto-open is on by default (this test browser already allows file access,
   // so no setup step shows; that path is unit tested). It can be turned off.

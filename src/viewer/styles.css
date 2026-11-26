@@ -25,6 +25,7 @@
   --level-quiet: #9aa1b1;
   --row-error: rgba(255, 122, 122, 0.05);
   --row-current: rgba(76, 141, 255, 0.16);
+  --row-flash: rgba(76, 141, 255, 0.45);
   --row-bookmark: rgba(76, 141, 255, 0.10);
   --hl0: rgba(47, 184, 168, 0.40);
   --hl1: rgba(167, 139, 250, 0.42);
@@ -63,6 +64,7 @@
   --level-quiet: #646c7d;
   --row-error: rgba(209, 52, 59, 0.06);
   --row-current: rgba(37, 99, 235, 0.12);
+  --row-flash: rgba(37, 99, 235, 0.32);
   --row-bookmark: rgba(37, 99, 235, 0.07);
   --hl0: rgba(20, 170, 150, 0.28);
   --hl1: rgba(139, 92, 246, 0.24);
@@ -126,6 +128,19 @@ button { font: inherit; color: inherit; }
 .row.lv2 { color: var(--warn-text); }
 .row.lv4, .row.lv5 { color: var(--debug-text); }
 .row.current { background: var(--row-current); }
+/* Word wrap: each row's height is set from its text length (src/core/wrap.ts),
+   so text breaks at exactly --wrap-cols characters, anywhere in a word. */
+.rows.wrap { right: 0; }
+.rows.wrap .row { overflow: hidden; align-items: flex-start; }
+.rows.wrap .row .text { flex: none; width: calc(var(--wrap-cols) * 1ch); padding-right: 0; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; tab-size: 4; }
+#wrap-toggle[aria-pressed="true"] { color: var(--accent); }
+/* The line a jump lands on flashes once (FLASH_MS in main.ts). */
+.row.flash { animation: flash 900ms ease-out both; }
+@keyframes flash {
+  0%, 25% { background: var(--row-flash); box-shadow: inset 3px 0 0 var(--accent); }
+  100% { background: var(--row-current); box-shadow: inset 3px 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .row.flash { animation: none; box-shadow: inset 3px 0 0 var(--accent); } }
 .row.bookmarked { background: var(--row-bookmark); }
 .gutter { flex: none; width: 72px; padding-right: 12px; margin-right: 12px; text-align: right; color: var(--gutter); background: none; border: 0; border-right: 2px solid transparent; font: inherit; cursor: pointer; user-select: none; }
 .gutter:hover { color: var(--text); }
@@ -135,8 +150,7 @@ button { font: inherit; color: inherit; }
 .row.bookmarked .gutter::before { content: '◆ '; }
 .text { padding-right: 24px; }
 mark { background: var(--hit); color: inherit; border-radius: 2px; }
-.gap { display: flex; align-items: center; width: 100%; height: var(--row-h); padding: 0; background: none; border: 0; color: var(--faint); font: inherit; text-align: left; cursor: pointer; }
-.gap:hover { color: var(--text); }
+.gap { display: flex; align-items: center; width: 100%; height: var(--row-h); padding: 0; background: none; border: 0; color: var(--faint); font: inherit; text-align: left; }
 .gap .gutter { border-right-color: transparent; }
 .gap .line { flex: 1; border-top: 1px dashed var(--border); margin-left: 8px; }
 
@@ -172,12 +186,13 @@ mark[class^='hl'] { color: inherit; border-radius: 2px; }
 .rules li { display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px 0 6px; border-radius: 4px; }
 .rules li:hover { background: var(--raised); }
 .swatch { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 3px; flex: none; cursor: pointer; }
+.swatch.off { background: none; box-shadow: inset 0 0 0 1.5px var(--border-strong); }
 .swatch:hover { outline: 2px solid var(--border-strong); outline-offset: 1px; }
-.rule-term { flex: 1; min-width: 0; padding: 0; background: none; border: 0; color: inherit; text-align: left; font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; cursor: text; }
-.rule-term:hover { text-decoration: underline dotted var(--muted); }
+.rule-term { flex: 1; min-width: 0; padding: 0; background: none; border: 0; color: inherit; text-align: left; font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: pre; cursor: pointer; }
+.rule-term:hover { color: var(--accent); text-decoration: underline; }
 .rule-edit { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--surface); border: 1px solid var(--accent); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
-.rule-remove { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
-.rule-remove:hover { color: var(--text-strong); background: var(--border); }
+.rule-btn { width: 22px; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; }
+.rule-btn:hover { color: var(--text-strong); background: var(--border); }
 .rule-form input { width: 100%; height: 26px; padding: 0 6px; background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text-strong); font: 12px var(--mono); outline: none; }
 .rule-form input:focus { border-style: solid; border-color: var(--accent); }
 .rules-note { margin: 4px 0 0; font-size: 11px; line-height: 1.4; }
@@ -195,15 +210,19 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .paste-box textarea:focus { border-color: var(--accent); }
 .tool-btn.primary { align-self: flex-start; background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
-.json-btn { flex: none; align-self: center; height: 16px; margin-left: 8px; padding: 0 5px; background: var(--raised); color: var(--link); border: 1px solid var(--border); border-radius: 4px; font: 500 10px/14px Inter, sans-serif; cursor: pointer; }
-.json-btn:hover { border-color: var(--accent); }
+.pv { text-decoration: underline dotted var(--link); text-underline-offset: 3px; cursor: pointer; border-radius: 2px; }
+.pv:hover { text-decoration-style: solid; background: var(--raised); }
+.pv:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .row.revealed .gutter { border-right-style: dashed; }
 /* Fold arrows at the gutter's left edge: › on a hidden run, ⌄ on one the user opened. */
 .row, .gap { position: relative; }
-.fold { position: absolute; left: 4px; top: 0; width: 18px; height: var(--row-h); padding: 0; background: none; border: 0; border-radius: 4px; color: var(--muted); font: 600 13px/var(--row-h) Inter, sans-serif; text-align: center; cursor: pointer; }
-.fold:hover, .gap:hover .fold { color: var(--accent); background: var(--raised); }
+.fold { flex: none; margin-left: 24px; padding: 0; background: none; border: 0; color: var(--faint); font: inherit; line-height: var(--row-h); cursor: pointer; }
+.fold:hover { color: var(--accent); text-decoration: underline; }
 .json-dialog { width: min(720px, 90vw); }
-.json-dialog pre { max-height: 60vh; overflow: auto; margin: 0 0 14px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); color: var(--text-strong); }
+.json-body { max-height: 60vh; overflow: auto; margin: 0 0 14px; }
+.json-name { margin: 10px 0 4px; color: var(--muted); font-size: 11px; }
+.json-name:first-child { margin-top: 0; }
+.json-dialog pre { overflow: auto; margin: 0 0 8px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.5 var(--mono); color: var(--text-strong); }
 .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 .url-box { display: flex; gap: 8px; }
@@ -225,11 +244,8 @@ kbd { font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--border-s
 .bm-nav[hidden] { display: none; }
 .bm-nav .link-btn { font-size: 14px; line-height: 1; }
 /* Big gaps: show a few lines from either end, or all. */
-.gap.big { cursor: pointer; }
-.gap.big .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
-.gap.big .gap-act:hover { color: var(--accent); background: var(--raised); }
-.rule-filter { padding: 0 6px; height: 20px; background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }
-.rule-filter:hover { color: var(--text-strong); border-color: var(--accent); }
+.gap .gap-act { padding: 0 6px; background: none; border: 0; border-radius: 4px; color: var(--muted); font: inherit; cursor: pointer; }
+.gap .gap-act:hover { color: var(--accent); background: var(--raised); }
 .rule-re { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 /* Loading: the Grepsy mark, its lens sweeping the lines. */
 .loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--bg); }
