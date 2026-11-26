@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findStructures, mayContainStructure } from '../src/core/pretty';
+import { findStructures, mayContainStructure, visibleStructures } from '../src/core/pretty';
 
 describe('findStructures: JSON', () => {
   it('finds a JSON object after the message', () => {
@@ -57,5 +57,60 @@ describe('mayContainStructure', () => {
     expect(mayContainStructure('[main] started')).toBe(false);
     expect(mayContainStructure('x {"a":1}')).toBe(true);
     expect(mayContainStructure('x <a/>')).toBe(true);
+  });
+
+  it('allows spaces after the bracket, as many loggers write JSON', () => {
+    for (const line of ['req { "a": 1 }', '{\t"level":"info"}', 'rows=[ {"a":1} ]', 'ids [ "a", "b" ]']) {
+      expect(mayContainStructure(line)).toBe(true);
+      expect(visibleStructures(line, 5000)).toHaveLength(1);
+    }
+  });
+});
+
+describe('findStructures: Python', () => {
+  it('reads a dict printed by Python, even inside a URL', () => {
+    const line = "2026-11-26T16:20:50.261Z [INFO utils.py::apply::1136::MainThread] POST https://somesite.com/software?task={'hosts': None, 'accept_eula': True}";
+    const [s, ...rest] = findStructures(line);
+    expect(rest).toEqual([]);
+    expect(s?.kind).toBe('python');
+    expect(s?.name).toBe('task');
+    expect(s?.raw).toBe("{'hosts': None, 'accept_eula': True}");
+    expect(s?.pretty).toBe("{\n  'hosts': None,\n  'accept_eula': True\n}");
+    expect(mayContainStructure(line)).toBe(true);
+  });
+
+  it('handles nesting, both quotes, escapes, numbers and a trailing comma', () => {
+    const [s] = findStructures(`x {'a': [1, 2.5, 1e3], "b": 'it\\'s', 'c': {'d': False,},}`);
+    expect(s?.kind).toBe('python');
+    expect(s?.pretty).toBe(`{\n  'a': [\n    1,\n    2.5,\n    1000\n  ],\n  'b': "it's",\n  'c': {\n    'd': False\n  }\n}`);
+  });
+
+  it('skips calls, sets and names that are not literals', () => {
+    expect(findStructures("x {'a': datetime(2026, 1, 1)} {'a', 'b'} {'k': value}")).toEqual([]);
+  });
+
+  it('still prefers strict JSON', () => {
+    expect(findStructures('x {"a": null}')[0]?.kind).toBe('json');
+  });
+});
+
+describe('visibleStructures', () => {
+  it('finds spaced JSON in a line', () => {
+    const [s] = visibleStructures('09:14 INFO sent { "order": "A-1", "items": [ 1, 2 ] }', 5000);
+    expect(s?.pretty).toBe(JSON.stringify({ order: 'A-1', items: [1, 2] }, null, 2));
+  });
+
+  it('opens a long JSON value in full when the line is cut short on screen', () => {
+    const big = JSON.stringify({ rows: Array.from({ length: 2000 }, (_, i) => ({ i })) });
+    const line = `INFO dump ${big}`;
+    const [s] = visibleStructures(line, 5000);
+    expect(s?.start).toBe(10);
+    expect(s?.end).toBe(5000);
+    expect(JSON.parse(s!.pretty)).toEqual(JSON.parse(big));
+  });
+
+  it('skips values that start past the drawn part', () => {
+    const line = 'x'.repeat(6000) + ' {"a":1}';
+    expect(visibleStructures(line, 5000)).toEqual([]);
   });
 });

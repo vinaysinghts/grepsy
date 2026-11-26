@@ -1,6 +1,6 @@
 import { isTextEntry } from '../core/download';
 import { splitTagged, type Pattern } from '../core/highlights';
-import { findStructures, mayContainStructure, type Structure } from '../core/pretty';
+import { visibleStructures, type Structure } from '../core/pretty';
 import { LEVEL_COUNT } from '../core/lineStore';
 import { nextLevels } from '../core/levelPick';
 import { compileQuery } from '../core/query';
@@ -339,13 +339,15 @@ function draw(): void {
   }
 }
 
+const KIND_LABEL: Record<Structure['kind'], string> = { json: 'JSON', python: 'Python value', xml: 'XML' };
+
 /** A JSON or XML value inside a line: underlined, and opens pretty-printed on click. */
 function valueEl(lineNumber: number, v: Structure): HTMLElement {
   const el = document.createElement('span');
   el.className = 'pv';
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
-  const what = v.kind === 'xml' ? 'XML' : 'JSON';
+  const what = KIND_LABEL[v.kind];
   el.title = `Pretty print this ${what}`;
   const open = () => showStructures(lineNumber, [v]);
   el.addEventListener('click', () => {
@@ -395,7 +397,7 @@ function lineEl(row: Extract<Row, { kind: 'line' }>, index: number): HTMLElement
   text.className = 'text';
   const shown = row.text.length > MAX_RENDERED_CHARS ? row.text.slice(0, MAX_RENDERED_CHARS) + ' …' : row.text;
   // JSON and XML values get a dotted underline; clicking one pretty-prints it.
-  const values = mayContainStructure(shown) ? findStructures(shown) : [];
+  const values = visibleStructures(row.text, MAX_RENDERED_CHARS);
   const holders = values.map((v) => valueEl(row.line + 1, v));
   // Log text is untrusted: it only ever goes in as text nodes, never as HTML.
   let at = 0;
@@ -912,7 +914,7 @@ function showStructures(lineNumber: number, found: Structure[]): void {
     if (found.length > 1 || f.name) {
       const h = document.createElement('div');
       h.className = 'json-name';
-      const what = f.name || (f.kind === 'xml' ? 'XML' : 'JSON');
+      const what = f.name || KIND_LABEL[f.kind];
       h.textContent = found.length > 1 ? `${i + 1} of ${found.length} · ${what}` : what;
       jsonBody.append(h);
     }
