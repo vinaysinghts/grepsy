@@ -59,6 +59,10 @@ To load it in your browser, open `chrome://extensions`, turn on **Developer mode
 
 The product name is `displayName` in `package.json`. The manifest and UI read it from there.
 
+## How this was built
+
+Grepsy was built with AI assistance. Most of the code, tests and docs were written by [Claude](https://claude.ai) (Anthropic) working from my direction. I set the product scope and UX, made the architecture calls (recorded in [`docs/adr/`](docs/adr/)), reviewed every pull request before merging, and tested each release by hand.
+
 ## License
 
 MIT
